@@ -65,6 +65,12 @@
     "scripts": {
         "check-cs": "ecs check --ansi",
         "fix-cs": "ecs check --fix --ansi",
-        "phpstan": "phpstan analyse --memory-limit=1G"
+        "phpstan": "phpstan analyse --memory-limit=1G",
+        "verify-invariants": "php bin/verify-invariants.php",
+        "check": [
+            "@verify-invariants",
+            "@check-cs",
+            "@phpstan"
+        ]
     }
 }

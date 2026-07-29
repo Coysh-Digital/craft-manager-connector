@@ -1,0 +1,53 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  invariants:
+    name: Security invariants
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: sodium
+          coverage: none
+
+      # Deliberately needs no dependencies and no Craft install, so it runs in a second and
+      # therefore actually gets run. It reads the source: whether this plugin registers an inbound
+      # endpoint or contains a means of execution is a property of the code, not of runtime.
+      - name: Connector invariants
+        run: php bin/verify-invariants.php
+
+  analyse:
+    name: Style and static analysis
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: sodium
+          coverage: none
+
+      - run: composer install --no-interaction --no-progress --prefer-dist
+
+      - run: composer check-cs
+
+      - run: composer phpstan
+
+      # New connector dependencies are reviewed more strictly than dashboard ones, so an advisory
+      # here blocks rather than warns.
+      - name: Dependency advisories
+        run: composer audit --locked
