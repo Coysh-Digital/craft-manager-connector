@@ -19,7 +19,7 @@ These are not promises about intent; they are properties of the code.
 | | |
 |---|---|
 | **No inbound endpoint** | The plugin registers no site or control-panel route that accepts management input. Every exchange is started by this plugin, outbound. It works from behind NAT with no inbound firewall rules. |
-| **No remote execution** | There is no console-command runner, no PHP evaluation, no SQL, no shell, no arbitrary file access. Version 1.0 reports and nothing else. |
+| **No remote execution** | There is no console-command runner, no PHP evaluation, no SQL, no shell, no arbitrary file access. Jobs come from a closed registry, and this plugin refuses any type it does not itself implement — so a compromised platform cannot make your site do something new. |
 | **No credentials held** | Manager never receives an administrator password, an SSH credential or a database password. There is nowhere in its schema to put one. |
 | **No site content** | What may be transmitted is fixed by a shared schema. The platform rejects anything outside it rather than quietly discarding the extra. |
 
@@ -71,12 +71,18 @@ the meantime.
 ## Scheduling
 
 ```cron
-*/5 * * * *  cd /path/to/site && php craft manager-connector/heartbeat
-0   * * * *  cd /path/to/site && php craft manager-connector/report
+*/5  * * * *  cd /path/to/site && php craft manager-connector/heartbeat
+*/5  * * * *  cd /path/to/site && php craft manager-connector/jobs
+0    * * * *  cd /path/to/site && php craft manager-connector/report
+17   4 * * *  cd /path/to/site && php craft manager-connector/updates
 ```
 
-The heartbeat carries no data at all; hourly is plenty for the report, since version numbers only
-change when you deploy.
+The heartbeat carries no data at all. Hourly is plenty for the inventory report, since version
+numbers only change when you deploy. The update check runs daily and at an odd minute, so a fleet of
+sites does not all ask Craft's update service at once.
+
+`jobs` is what makes anything the platform asks for actually happen. Nothing is pushed to your site —
+the platform has no way to reach it — so this is the site choosing to ask.
 
 ## Commands
 
@@ -85,6 +91,8 @@ change when you deploy.
 | `manager-connector/pair <code>` | Pair with a platform |
 | `manager-connector/heartbeat` | Report liveness |
 | `manager-connector/report` | Send an inventory report |
+| `manager-connector/updates` | Check for updates and report what is available |
+| `manager-connector/jobs` | Ask the platform whether there is anything to do, and do it |
 | `manager-connector/preview` | Print what would be sent, without sending it |
 | `manager-connector/status` | Show the current connection |
 | `manager-connector/disconnect` | Delete this site's signing key |

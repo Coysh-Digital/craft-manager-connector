@@ -117,6 +117,34 @@ foreach ($sources as $file) {
 }
 
 // --------------------------------------------------------------------------------------------------
+// Invariant 9, from the connector's side: it refuses job types it does not implement.
+// --------------------------------------------------------------------------------------------------
+//
+// The platform refuses to *issue* an unknown job type; this refuses to *execute* one. Two independent
+// refusals, because they protect against different failures — the platform's stops a mistake, the
+// connector's stops a compromised or impersonated platform.
+$checks++;
+
+$runner = (string) file_get_contents($sourceDir.'/services/JobRunner.php');
+
+if (! str_contains($runner, 'function canHandle(')) {
+    $failures[] = 'src/services/JobRunner.php no longer gates job types through canHandle() (invariant 9).';
+}
+
+if (! str_contains($runner, 'if (! $this->canHandle($type))')) {
+    $failures[] = 'src/services/JobRunner.php no longer refuses unrecognised job types before running them (invariant 9).';
+}
+
+// Dispatch must not be derived from the payload. A method name built from a job type, or a callable
+// resolved from a string, would turn the job type into a way to reach arbitrary code — which is
+// invariant 8 by the back door.
+foreach (['call_user_func', 'call_user_func_array', '$this->$', '->{$', 'ReflectionMethod', 'invokeArgs'] as $dynamic) {
+    if (str_contains($runner, $dynamic)) {
+        $failures[] = "src/services/JobRunner.php dispatches dynamically via '{$dynamic}'; use a match over known constants (invariants 8 and 9).";
+    }
+}
+
+// --------------------------------------------------------------------------------------------------
 // Dependencies stay conservative.
 // --------------------------------------------------------------------------------------------------
 //

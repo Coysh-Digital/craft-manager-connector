@@ -1,7 +1,7 @@
 {
     "name": "coysh-digital/craft-manager-connector",
     "description": "Reports operational metadata from a Craft CMS installation to a Manager platform over signed, outbound-only requests.",
-    "version": "1.0.0",
+    "version": "1.1.0",
     "type": "craft-plugin",
     "keywords": [
         "craft",
@@ -50,7 +50,9 @@
         "components": {
             "connection": "coyshdigital\\managerconnector\\services\\Connection",
             "client": "coyshdigital\\managerconnector\\services\\Client",
-            "reporter": "coyshdigital\\managerconnector\\services\\Reporter"
+            "reporter": "coyshdigital\\managerconnector\\services\\Reporter",
+            "updates": "coyshdigital\\managerconnector\\services\\UpdatesReporter",
+            "jobs": "coyshdigital\\managerconnector\\services\\JobRunner"
         }
     },
     "config": {

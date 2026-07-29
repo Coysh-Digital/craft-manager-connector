@@ -15,7 +15,9 @@ use Craft;
 use coyshdigital\managerconnector\models\Settings;
 use coyshdigital\managerconnector\services\Client;
 use coyshdigital\managerconnector\services\Connection;
+use coyshdigital\managerconnector\services\JobRunner;
 use coyshdigital\managerconnector\services\Reporter;
+use coyshdigital\managerconnector\services\UpdatesReporter;
 use craft\base\Model;
 use craft\base\Plugin as BasePlugin;
 use craft\console\Application as ConsoleApplication;
@@ -42,6 +44,8 @@ use craft\helpers\UrlHelper;
  * @property-read Connection $connection
  * @property-read Client $client
  * @property-read Reporter $reporter
+ * @property-read UpdatesReporter $updates
+ * @property-read JobRunner $jobs
  *
  * @author Coysh Digital
  *
@@ -52,7 +56,7 @@ class Plugin extends BasePlugin
     /**
      * @var string The connector version reported to the platform and signed into every request.
      */
-    public const VERSION = '1.0.0';
+    public const VERSION = '1.1.0';
 
     /**
      * @inheritdoc
