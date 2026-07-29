@@ -1,0 +1,70 @@
+{
+    "name": "coysh-digital/craft-manager-connector",
+    "description": "Reports operational metadata from a Craft CMS installation to a Manager platform over signed, outbound-only requests.",
+    "version": "1.0.0",
+    "type": "craft-plugin",
+    "keywords": [
+        "craft",
+        "cms",
+        "craftcms",
+        "craft-plugin",
+        "monitoring",
+        "manager"
+    ],
+    "license": "proprietary",
+    "support": {
+        "email": "security@coysh.digital",
+        "issues": "https://github.com/Coysh-Digital/craft-manager-connector/issues",
+        "source": "https://github.com/Coysh-Digital/craft-manager-connector",
+        "docs": "https://coysh.digital/manager/docs/connector/"
+    },
+    "authors": [
+        {
+            "name": "Coysh Digital",
+            "homepage": "https://coysh.digital"
+        }
+    ],
+    "require": {
+        "php": ">=8.2",
+        "ext-sodium": "*",
+        "craftcms/cms": "^5.0.0",
+        "coysh-digital/manager-protocol": "^1.0"
+    },
+    "require-dev": {
+        "craftcms/ecs": "dev-main",
+        "craftcms/phpstan": "dev-main"
+    },
+    "autoload": {
+        "psr-4": {
+            "coyshdigital\\managerconnector\\": "src/"
+        }
+    },
+    "extra": {
+        "name": "Manager Connector",
+        "handle": "manager-connector",
+        "developer": "Coysh Digital",
+        "developerUrl": "https://coysh.digital",
+        "documentationUrl": "https://coysh.digital/manager/docs/connector/",
+        "changelogUrl": "https://raw.githubusercontent.com/Coysh-Digital/craft-manager-connector/main/CHANGELOG.md",
+        "class": "coyshdigital\\managerconnector\\Plugin",
+        "components": {
+            "connection": "coyshdigital\\managerconnector\\services\\Connection",
+            "client": "coyshdigital\\managerconnector\\services\\Client",
+            "reporter": "coyshdigital\\managerconnector\\services\\Reporter"
+        }
+    },
+    "config": {
+        "platform": {
+            "php": "8.2"
+        },
+        "allow-plugins": {
+            "yiisoft/yii2-composer": true,
+            "craftcms/plugin-installer": true
+        }
+    },
+    "scripts": {
+        "check-cs": "ecs check --ansi",
+        "fix-cs": "ecs check --fix --ansi",
+        "phpstan": "phpstan analyse --memory-limit=1G"
+    }
+}

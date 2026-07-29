@@ -1,0 +1,100 @@
+{# Manager Connector settings.
+
+   Read-only by design. The specification asks for a concise view of the connection and nothing
+   more, so there is no button here that changes anything: pairing and disconnection are console
+   commands run by someone with server access, which keeps a hijacked control-panel session from
+   being able to hand a platform access to this site or take it away.
+#}
+{% import "_includes/forms.twig" as forms %}
+
+{% set connection = connection ?? null %}
+
+{% if connection is null %}
+    <div class="readable">
+        <blockquote class="note">
+            <p><strong>This site is not connected to a Manager platform.</strong></p>
+            <p>To connect it, ask your administrator for a single-use enrolment code and run:</p>
+            <pre><code>php craft manager-connector/pair &lt;code&gt;</code></pre>
+            <p>The signing key is generated on this server and never leaves it.</p>
+        </blockquote>
+    </div>
+{% else %}
+    {% if connection.state == 'pending_confirmation' %}
+        <div class="readable">
+            <blockquote class="note warning">
+                <p><strong>Waiting for confirmation.</strong></p>
+                <p>
+                    This site paired from a different domain than the platform expected, so nothing is
+                    being reported until an administrator confirms it in Manager.
+                </p>
+            </blockquote>
+        </div>
+    {% endif %}
+
+    <table class="data fullwidth">
+        <tbody>
+            <tr>
+                <th scope="row">{{ "Connection state"|t('manager-connector') }}</th>
+                <td>
+                    {% if connection.state == 'active' %}
+                        <span class="status green"></span> {{ "Connected"|t('manager-connector') }}
+                    {% elseif connection.state == 'pending_confirmation' %}
+                        <span class="status orange"></span> {{ "Awaiting confirmation"|t('manager-connector') }}
+                    {% else %}
+                        <span class="status"></span> {{ "Disconnected"|t('manager-connector') }}
+                    {% endif %}
+                </td>
+            </tr>
+            <tr>
+                <th scope="row">{{ "Manager platform"|t('manager-connector') }}</th>
+                <td><code>{{ connection.platformUrl }}</code></td>
+            </tr>
+            <tr>
+                <th scope="row">{{ "Site identifier"|t('manager-connector') }}</th>
+                <td><code>{{ connection.siteIdentifier }}</code></td>
+            </tr>
+            <tr>
+                <th scope="row">{{ "Enabled capabilities"|t('manager-connector') }}</th>
+                <td>
+                    {% set capabilities = connection.capabilities ? connection.capabilities|json_decode : [] %}
+                    {% if capabilities|length %}
+                        {% for capability in capabilities %}
+                            <code>{{ capability }}</code>{{ not loop.last ? ', ' }}
+                        {% endfor %}
+                    {% else %}
+                        {{ "None. This site reports nothing."|t('manager-connector') }}
+                    {% endif %}
+                </td>
+            </tr>
+            <tr>
+                <th scope="row">{{ "Last successful connection"|t('manager-connector') }}</th>
+                <td>{{ connection.lastSuccessAt ? connection.lastSuccessAt|datetime('short') : "Never"|t('manager-connector') }}</td>
+            </tr>
+            <tr>
+                <th scope="row">{{ "Connector version"|t('manager-connector') }}</th>
+                <td><code>{{ connectorVersion }}</code></td>
+            </tr>
+            <tr>
+                <th scope="row">{{ "Credentials rotated"|t('manager-connector') }}</th>
+                <td>{{ connection.keyRotatedAt ? connection.keyRotatedAt|datetime('short') : "Never"|t('manager-connector') }}</td>
+            </tr>
+            <tr>
+                <th scope="row">{{ "Disconnect"|t('manager-connector') }}</th>
+                <td>
+                    <p class="light">
+                        {{ "Deletes this site's signing key. Run on the server:"|t('manager-connector') }}
+                    </p>
+                    <pre><code>php craft manager-connector/disconnect</code></pre>
+                </td>
+            </tr>
+        </tbody>
+    </table>
+
+    <div class="readable" style="margin-top: 1.5rem;">
+        <p class="light">
+            {{ "Manager holds only this site's public key, and never an administrator password, an SSH credential or a database password. To see exactly what this site reports, run"|t('manager-connector') }}
+            <code>php craft manager-connector/preview</code>.
+            <a href="{{ securityUrl }}" rel="noopener" target="_blank">{{ "Security documentation"|t('manager-connector') }}</a>
+        </p>
+    </div>
+{% endif %}
