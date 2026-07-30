@@ -113,7 +113,7 @@ stops expecting it.
 
 ## Security
 
-Report vulnerabilities privately to security@coysh.digital. Please do not open a public issue.
+Report vulnerabilities privately to hello@coysh.digital. Please do not open a public issue.
 
 Requires PHP 8.2+ and Craft CMS 5.0+. Dependencies are limited to the shared protocol package and
 PHP's own `sodium` extension; HTTP goes through the Guzzle client Craft already ships.

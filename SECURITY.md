@@ -2,7 +2,7 @@
 
 ## Reporting a vulnerability
 
-Email **security@coysh.digital**. Please do not open a public issue.
+Email **hello@coysh.digital**. Please do not open a public issue.
 
 Include the connector version, the Craft version, and enough detail to reproduce. If you have a
 proof of concept, say so rather than attaching it in the clear.

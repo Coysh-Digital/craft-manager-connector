@@ -25,5 +25,5 @@ Provided "as is", without warranty of any kind. See the platform licence for the
 
 ## Reporting a security issue
 
-Privately, to **security@coysh.digital**. Please do not open a public issue. See
+Privately, to **hello@coysh.digital**. Please do not open a public issue. See
 [SECURITY.md](SECURITY.md).
