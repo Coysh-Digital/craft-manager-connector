@@ -64,7 +64,6 @@ services:
   web:
     volumes:
       - ../../connector:/var/www/connector
-      - ../../protocol:/var/www/protocol
 
     # Without this, *.ddev.site resolves to this container rather than the platform's.
     external_links:
@@ -85,11 +84,16 @@ ddev craft install \
     --site-url='https://manager-testbed.ddev.site' \
     --language=en-GB
 
-echo "==> Linking the connector and protocol from source"
-# Container-absolute paths, which is why ddev composer must be used in this project rather than
-# host composer.
+echo "==> Linking the connector from source"
+# The connector is symlinked so editing src/*.php takes effect on the next request. A
+# container-absolute path, which is why ddev composer must be used in this project rather than host
+# composer.
+#
+# The protocol package is deliberately NOT linked. It comes from Packagist, the same version a real
+# Craft site would resolve, so the testbed exercises the published contract rather than whatever is
+# in a sibling working copy. Testing against local protocol source is how the two sides drift apart
+# without either suite noticing.
 ddev composer config repositories.manager-connector '{"type":"path","url":"/var/www/connector","options":{"symlink":true}}'
-ddev composer config repositories.manager-protocol '{"type":"path","url":"/var/www/protocol","options":{"symlink":true}}'
 ddev composer config minimum-stability dev
 ddev composer config prefer-stable true
 ddev composer require coysh-digital/craft-manager-connector:@dev -W
