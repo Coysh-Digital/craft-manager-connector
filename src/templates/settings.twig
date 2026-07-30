@@ -1,23 +1,81 @@
 {# Manager Connector settings.
 
-   Read-only by design. The specification asks for a concise view of the connection and nothing
-   more, so there is no button here that changes anything: pairing and disconnection are console
-   commands run by someone with server access, which keeps a hijacked control-panel session from
-   being able to hand a platform access to this site or take it away.
+   Almost read-only. The only things this screen can change are pairing and disconnecting, and they
+   are here because the console is not always available — plenty of Craft sites run on managed hosting
+   with no shell, and "you need SSH" would exclude them rather than inconvenience them.
+
+   Both actions require an administrator and a POST carrying Craft's CSRF token, and both are outbound:
+   pressing a button here makes this site call the platform. Nothing on this screen lets a platform call
+   in, and nothing here accepts an instruction from one.
+
+   When platformUrl is set in config/manager-connector.php the address cannot be changed from this
+   screen. That is the point of setting it: on a site configured that way, a hijacked session can only
+   ever pair with the platform the operator already chose.
 #}
+{% extends "_layouts/cp.twig" %}
 {% import "_includes/forms.twig" as forms %}
 
+{% set title = "Manager Connector"|t('manager-connector') %}
+{% set crumbs = [
+    { label: "Settings"|t('app'), url: url('settings') },
+    { label: "Plugins"|t('app'), url: url('settings/plugins') },
+] %}
+
+{% block content %}
+
 {% set connection = connection ?? null %}
+
+{% set configuredUrl = settings.platformUrl|default('')|trim %}
 
 {% if connection is null %}
     <div class="readable">
         <blockquote class="note">
             <p><strong>This site is not connected to a Manager platform.</strong></p>
-            <p>To connect it, ask your administrator for a single-use enrolment code and run:</p>
-            <pre><code>php craft manager-connector/pair &lt;code&gt;</code></pre>
-            <p>The signing key is generated on this server and never leaves it.</p>
+            <p>Ask for a single-use enrolment code in Manager, then paste it below.</p>
+            <p>
+                The signing key is generated on this server and never leaves it. Manager receives the
+                public half only, and never an administrator password or a database credential.
+            </p>
         </blockquote>
     </div>
+
+    <form method="post" accept-charset="UTF-8">
+        {{ csrfInput() }}
+        {{ actionInput('manager-connector/enrol/pair') }}
+        {{ redirectInput('settings/plugins/manager-connector') }}
+
+        {% if configuredUrl %}
+            {{ forms.field({
+                label: "Manager platform"|t('manager-connector'),
+                instructions: "Set in config/manager-connector.php, so it cannot be changed from here."|t('manager-connector'),
+            }, '<code>' ~ configuredUrl ~ '</code>') }}
+        {% else %}
+            {{ forms.autosuggestField({
+                label: "Manager platform"|t('manager-connector'),
+                instructions: "The address of your Manager installation. Must be HTTPS — a signed request over plain HTTP is still readable in transit, including the code below. Check it carefully: this is where the site's operational state will be sent."|t('manager-connector'),
+                id: 'platformUrl',
+                name: 'platformUrl',
+                placeholder: 'https://manager.example.org',
+                suggestEnvVars: true,
+                required: true,
+            }) }}
+        {% endif %}
+
+        {{ forms.textField({
+            label: "Enrolment code"|t('manager-connector'),
+            instructions: "Single-use, and it expires. Issue a fresh one in Manager if this fails."|t('manager-connector'),
+            id: 'enrolmentCode',
+            name: 'enrolmentCode',
+            placeholder: 'mgr_enrol_…',
+            required: true,
+            autocomplete: false,
+            class: 'code',
+        }) }}
+
+        <div class="buttons">
+            <button type="submit" class="btn submit">{{ "Pair this site"|t('manager-connector') }}</button>
+        </div>
+    </form>
 {% else %}
     {% if connection.state == 'pending_confirmation' %}
         <div class="readable">
@@ -103,9 +161,26 @@
                 <th scope="row">{{ "Disconnect"|t('manager-connector') }}</th>
                 <td>
                     <p class="light">
-                        {{ "Deletes this site's signing key. Run on the server:"|t('manager-connector') }}
+                        {{ "Deletes this site's signing key, so it stops reporting. Revoke the connector in Manager as well, or the platform will keep expecting it."|t('manager-connector') }}
                     </p>
-                    <pre><code>php craft manager-connector/disconnect</code></pre>
+
+                    <form method="post" accept-charset="UTF-8">
+                        {{ csrfInput() }}
+                        {{ actionInput('manager-connector/enrol/disconnect') }}
+                        {{ redirectInput('settings/plugins/manager-connector') }}
+
+                        <div class="buttons">
+                            <button type="submit" class="btn"
+                                    data-confirm="{{ 'Delete this site\'s signing key? It will stop reporting until it is paired again.'|t('manager-connector') }}">
+                                {{ "Disconnect"|t('manager-connector') }}
+                            </button>
+                        </div>
+                    </form>
+
+                    <p class="light">
+                        {{ "On the console:"|t('manager-connector') }}
+                        <code>php craft manager-connector/disconnect</code>
+                    </p>
                 </td>
             </tr>
         </tbody>
@@ -119,3 +194,4 @@
         </p>
     </div>
 {% endif %}
+{% endblock %}

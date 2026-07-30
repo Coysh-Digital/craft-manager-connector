@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.3.0
+
+- Pair and disconnect from the control panel. The console still works, but requiring SSH excluded
+  every site on managed hosting without a shell, which is an exclusion rather than an inconvenience.
+- Fixed a redirect loop on the plugin settings screen. It redirected to itself, so the page could not
+  be opened at all.
+- Refuses a platform URL that is not HTTPS. The setting previously supplied `https` as a *default*
+  scheme, which silently accepts an explicit `http://` — and a signed request over plain HTTP is
+  still readable in transit, including the enrolment code used to pair.
+- When `platformUrl` is set in `config/manager-connector.php`, the control panel cannot override it.
+  On a site configured that way, a hijacked session can only pair with the platform already chosen.
+
 ## 1.2.0
 
 - Runs `backup.create` jobs. The database is dumped through Craft's own backup, using the connection

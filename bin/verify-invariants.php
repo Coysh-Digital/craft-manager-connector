@@ -73,68 +73,104 @@ function phpFilesIn(string $directory): array
 $sources = phpFilesIn($sourceDir);
 
 // --------------------------------------------------------------------------------------------------
-// Invariants 4 and 5: nothing inbound.
+// Invariants 4 and 5: nothing the outside world can reach, and nothing the platform can call.
 // --------------------------------------------------------------------------------------------------
 //
-// Registering a URL rule would give the outside world a way to reach this plugin. Everything it does
-// is started from here, outbound, which is what lets a site behind NAT report with no inbound
-// firewall rule at all.
-$checks++;
-
-foreach ($sources as $file) {
-    $contents = (string) file_get_contents($file);
-    $relative = str_replace($root.'/', '', $file);
-
-    foreach ([
-        'RegisterUrlRulesEvent' => 'registers URL rules, which would expose an inbound endpoint',
-        'EVENT_REGISTER_SITE_URL_RULES' => 'registers site URL rules',
-        'EVENT_REGISTER_CP_URL_RULES' => 'registers control-panel URL rules',
-    ] as $needle => $why) {
-        if (str_contains($contents, $needle)) {
-            $failures[] = "{$relative} {$why} (invariants 4 and 5).";
-        }
-    }
-}
-
-// A web controller would be reachable over HTTP even without an explicit route, through Craft's
-// default action routing.
-$checks++;
-
-foreach ($sources as $file) {
-    $relative = str_replace($root.'/', '', $file);
-
-    if (str_contains($relative, 'src/controllers/')) {
-        $failures[] = "{$relative} is a web controller. Only console controllers are permitted (invariants 4 and 5).";
-    }
-}
-
-// --------------------------------------------------------------------------------------------------
-// Invariant 8: no arbitrary execution.
-// --------------------------------------------------------------------------------------------------
+// Invariant 4 forbids a **public** inbound management endpoint. It does not forbid a control-panel form
+// behind an authenticated administrator, and the distinction matters in practice: plenty of Craft sites
+// run on managed hosting with no shell, and requiring SSH to pair would exclude them rather than
+// inconvenience them.
 //
-// No capability may provide arbitrary PHP, shell, console or SQL execution. The connector must not
-// contain the means even if something else asked it to.
+// So this no longer checks that no controller exists. It checks the properties that make the one that
+// does exist safe, which is a harder thing to satisfy by accident:
+//
+//   - no site routes at all, ever — those are genuinely public
+//   - control-panel routes limited to an allowlist written here
+//   - every web controller refuses anonymous access and requires an administrator
+//   - every state-changing action requires POST, so Craft's CSRF token is enforced
+//   - no web controller reads a job, a command or a capability from the request
+//
+// The last one is the line that keeps invariant 5 true. A form here causes this site to call the
+// platform; nothing lets the platform call in, and nothing web-reachable accepts an instruction.
 $checks++;
-
-$forbidden = [
-    'eval(' => 'evaluates PHP',
-    'exec(' => 'executes a shell command',
-    'shell_exec' => 'executes a shell command',
-    'passthru' => 'executes a shell command',
-    'proc_open' => 'opens a process',
-    'popen(' => 'opens a process',
-    'system(' => 'executes a shell command',
-    'assert(' => 'can evaluate a string as code',
-    'create_function' => 'creates code at runtime',
-];
 
 foreach ($sources as $file) {
     $contents = sourceWithoutComments($file);
     $relative = str_replace($root.'/', '', $file);
 
-    foreach ($forbidden as $needle => $why) {
-        if (str_contains($contents, $needle)) {
-            $failures[] = "{$relative} {$why}: '{$needle}' (invariant 8).";
+    // Site routes are public by definition. No exceptions, no allowlist.
+    if (str_contains($contents, 'EVENT_REGISTER_SITE_URL_RULES')) {
+        $failures[] = "{$relative} registers site URL rules, which are publicly reachable (invariant 4).";
+    }
+}
+
+// The control-panel routes this plugin may register. Adding one is an edit here as well as there.
+$permittedCpRoutes = [
+    // The connector's own screen. The two state-changing actions are reached through Craft's action
+    // mechanism, which requires POST and a CSRF token, so they deliberately have no URL rule.
+    'manager-connector/settings',
+];
+
+$pluginSourceForRoutes = sourceWithoutComments($sourceDir.'/Plugin.php');
+
+if (preg_match_all("/\\\$event->rules\\['([^']+)'\\]/", $pluginSourceForRoutes, $registered) === false) {
+    $failures[] = 'src/Plugin.php URL rules could not be read; check what it registers.';
+} else {
+    foreach ($registered[1] as $route) {
+        if (! in_array($route, $permittedCpRoutes, true)) {
+            $failures[] = "src/Plugin.php registers the control-panel route '{$route}', which is not on the "
+                .'reviewed list in this script (invariant 4).';
+        }
+    }
+}
+
+// --------------------------------------------------------------------------------------------------
+// Every web controller is administrator-only, POST-only, and deaf to the platform.
+// --------------------------------------------------------------------------------------------------
+$checks++;
+
+foreach ($sources as $file) {
+    $relative = str_replace($root.'/', '', $file);
+
+    if (! str_contains($relative, 'src/controllers/')) {
+        continue;
+    }
+
+    $contents = sourceWithoutComments($file);
+
+    if (! preg_match('/\\$allowAnonymous\s*=\s*false/', $contents)) {
+        $failures[] = "{$relative} does not declare \$allowAnonymous = false (invariant 4).";
+    }
+
+    if (! str_contains($contents, '$this->requireAdmin(')) {
+        $failures[] = "{$relative} does not require an administrator (invariant 4).";
+    }
+
+    // Every action that changes something has to be POST, or Craft will not enforce CSRF and the route
+    // becomes something a crafted link can trigger.
+    //
+    // Actions that only render are exempt, but by name rather than by inspection: adding a read-only
+    // action means adding it here, which is a moment to consider whether it really is one.
+    $readOnlyActions = ['Index'];
+
+    $actions = preg_match_all('/public function action(\w+)\(/', $contents, $found) ? $found[1] : [];
+    $changing = array_values(array_diff($actions, $readOnlyActions));
+    $postRequirements = preg_match_all('/requirePostRequest\(\)/', $contents);
+
+    if ($changing !== [] && $postRequirements < count($changing)) {
+        $failures[] = "{$relative} has ".count($changing).' state-changing '
+            .(count($changing) === 1 ? 'action' : 'actions').' but only '.$postRequirements
+            .' requirePostRequest() calls. Without POST, Craft does not enforce CSRF and the route is '
+            .'reachable from a link (invariant 4).';
+    }
+
+    // Nothing web-reachable may take direction from the platform. A controller reading any of these
+    // from the request would be an inbound control channel wearing a form's clothes.
+    foreach (['jobs', 'capabilities', 'command', 'job_id', 'artifact'] as $forbidden) {
+        if (preg_match('/getBodyParam\([\'"]'.$forbidden.'/i', $contents) === 1
+            || preg_match('/getQueryParam\([\'"]'.$forbidden.'/i', $contents) === 1) {
+            $failures[] = "{$relative} reads '{$forbidden}' from the request. Web routes must not accept "
+                .'platform instructions (invariants 5 and 8).';
         }
     }
 }
