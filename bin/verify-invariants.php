@@ -264,6 +264,35 @@ if (preg_match('~finally\s*\{.{0,400}?shred\(\$dump.{0,300}?shred\(\$encrypted~s
 }
 
 // --------------------------------------------------------------------------------------------------
+// The declared version agrees with itself.
+// --------------------------------------------------------------------------------------------------
+//
+// Invariant 17 asks for verifiable release artifacts, and a release whose version is ambiguous is not
+// one. This connector states its version in two places — the constant it signs into every request, and
+// composer.json — and a release adds a third in the git tag.
+//
+// This check exists because those drifted: the constant went to 1.2.0 and composer.json stayed at
+// 1.1.0, so Packagist saw a tag that disagreed with the manifest and published nothing at all. The
+// failure was silent from here and only visible as a package with no versions.
+$checks++;
+
+$pluginSource = sourceWithoutComments($sourceDir.'/Plugin.php');
+
+if (preg_match("/const VERSION = '([^']+)'/", $pluginSource, $constant) !== 1) {
+    $failures[] = 'src/Plugin.php no longer declares a VERSION constant.';
+} else {
+    $declared = $manifest['version'] ?? null;
+
+    if ($declared === null) {
+        $failures[] = 'composer.json has no version field, but Plugin::VERSION is '.$constant[1]
+            .'. Either both state the version or neither does.';
+    } elseif ($declared !== $constant[1]) {
+        $failures[] = "composer.json says version {$declared} but Plugin::VERSION is {$constant[1]}. "
+            .'A release with two different version numbers is not a verifiable one (invariant 17).';
+    }
+}
+
+// --------------------------------------------------------------------------------------------------
 // Report
 // --------------------------------------------------------------------------------------------------
 
