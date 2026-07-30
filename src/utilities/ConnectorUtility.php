@@ -18,13 +18,18 @@ use craft\base\Utility;
 /**
  * The connector's screen, in Utilities.
  *
- * A utility rather than a settings page, and the reason is not reachability — a plugin settings page
- * remains linked and reachable even with `allowAdminChanges` off, which was checked rather than assumed.
- * It is about what this screen is.
+ * A utility rather than a settings page, for two reasons.
  *
- * Settings hold things that *are set*. Utilities hold things you *do*: Craft's own list is Updates,
- * Caches, Database Backup, Migrations. Pairing is an action with an effect on the outside world, not a
- * value being recorded, and it belongs with those.
+ * The first is reachability, and an earlier version of this comment had it wrong. With
+ * `allowAdminChanges` genuinely off, Craft renders the plugins list but **does not link** a plugin's
+ * settings page — so enrolment behind plugin settings is undiscoverable on exactly the hardened
+ * production sites that most need it. The first test of this appeared to show otherwise because the
+ * setting was being overridden by CRAFT_ALLOW_ADMIN_CHANGES in the environment, which takes precedence
+ * over config/general.php. Utilities are unaffected and stay in the navigation.
+ *
+ * The second is what this screen is. Settings hold things that *are set*. Utilities hold things you
+ * *do*: Craft's own list is Updates, Caches, Database Backup, Migrations. Pairing is an action with an
+ * effect on the outside world, not a value being recorded, and it belongs with those.
  *
  * Two practical consequences follow, and both matter on the kind of site this plugin is for:
  *

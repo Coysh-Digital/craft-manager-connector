@@ -61,6 +61,21 @@ Pairing exchanges a single-use code for an identity. From then on every request 
 that was generated on your server, and the platform verifies the signature before it will accept
 anything.
 
+## Which Manager?
+
+This plugin works with either, and is identical for both.
+
+**[Manager Self-Hosted](https://github.com/Coysh-Digital/manager)** is free, source-available and
+feature-complete — no reduced edition and nothing held back. Running it means running a
+security-sensitive service: a patched server, Postgres and Redis, TLS, encryption keys backed up
+separately, and a store holding a copy of every managed site's database.
+
+**[Manager Cloud](https://coysh.digital/manager)** is that, hosted by Coysh Digital. Same connector,
+same protocol, same security boundaries — the server, the keys, the storage and the on-call rota are
+ours.
+
+Moving between them means re-pairing your sites, not rebuilding anything.
+
 ## Where to go next
 
 | | |

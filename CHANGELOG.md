@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+- **Correction to the 1.4.0 note below.** It claimed a plugin settings page stays linked with
+  `allowAdminChanges` off, "checked rather than assumed". The check was wrong: the testbed had
+  `CRAFT_ALLOW_ADMIN_CHANGES=true` in its environment, which takes precedence over
+  `config/general.php`, so the setting under test was never actually applied. Retested properly, Craft
+  renders the plugins list but does **not** link a plugin's settings page when admin changes are off.
+  Moving the screen to Utilities was therefore necessary rather than merely tidier, and enrolment
+  behind plugin settings would have been unreachable on hardened production sites.
+
 ## 1.4.1
 
 - An icon, in the same family as the other Coysh Digital Craft plugins: one site reporting outbound to
