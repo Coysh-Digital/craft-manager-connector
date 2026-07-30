@@ -1,5 +1,19 @@
 # Changelog
 
+## 1.2.0
+
+- Runs `backup.create` jobs. The database is dumped through Craft's own backup, using the connection
+  the site already has, then encrypted here with a key generated on this server and sealed to the
+  platform. The plaintext dump is deleted whether the upload succeeds or not.
+- Backups are uploaded to the platform this site paired with and nowhere else. The job carries no
+  destination and there is no argument anywhere in the upload path that could supply one, so a
+  compromised platform can ask for a backup but cannot ask for one to be sent elsewhere.
+- Refuses to back up at all if the platform has published no encryption key. A database never travels
+  in the clear.
+- Learns the platform's artifact encryption key from signature-verified responses only, so a rotation
+  is followed automatically and an intercepted response cannot substitute a key.
+- `uploadTimeout` and `maxBackupMegabytes` settings.
+
 ## 1.1.0
 
 - Reports available Craft and plugin updates, including whether any release in between is flagged

@@ -28,6 +28,29 @@ $failures = [];
 $checks = 0;
 
 /**
+ * A file's code with its comments removed.
+ *
+ * Every "does this source contain X" check below runs against this rather than the raw file. Scanning
+ * raw text means a docblock explaining why the connector does not shell out reads, to the checker,
+ * exactly like shelling out — and a check that prose can trip is a check people learn to phrase around
+ * instead of a check that holds.
+ */
+function sourceWithoutComments(string $path): string
+{
+    $code = '';
+
+    foreach (token_get_all((string) file_get_contents($path)) as $token) {
+        if (is_array($token) && in_array($token[0], [T_COMMENT, T_DOC_COMMENT], true)) {
+            continue;
+        }
+
+        $code .= is_array($token) ? $token[1] : $token;
+    }
+
+    return $code;
+}
+
+/**
  * @return list<string>
  */
 function phpFilesIn(string $directory): array
@@ -106,7 +129,7 @@ $forbidden = [
 ];
 
 foreach ($sources as $file) {
-    $contents = (string) file_get_contents($file);
+    $contents = sourceWithoutComments($file);
     $relative = str_replace($root.'/', '', $file);
 
     foreach ($forbidden as $needle => $why) {
@@ -125,7 +148,7 @@ foreach ($sources as $file) {
 // connector's stops a compromised or impersonated platform.
 $checks++;
 
-$runner = (string) file_get_contents($sourceDir.'/services/JobRunner.php');
+$runner = sourceWithoutComments($sourceDir.'/services/JobRunner.php');
 
 if (! str_contains($runner, 'function canHandle(')) {
     $failures[] = 'src/services/JobRunner.php no longer gates job types through canHandle() (invariant 9).';
@@ -170,7 +193,7 @@ if ($unexpected !== []) {
 // --------------------------------------------------------------------------------------------------
 $checks++;
 
-$client = (string) file_get_contents($sourceDir.'/services/Client.php');
+$client = sourceWithoutComments($sourceDir.'/services/Client.php');
 
 // The pairing request sends the public half only. If the secret key ever appeared in a payload, the
 // platform would hold something that could impersonate this site.
@@ -180,6 +203,64 @@ if (preg_match('/[\'"]secret_key[\'"]\s*=>/', $client) === 1) {
 
 if (! str_contains($client, "'public_key' => \$keypair['public']")) {
     $failures[] = 'src/services/Client.php no longer sends the public key during pairing; check what it sends instead.';
+}
+
+// --------------------------------------------------------------------------------------------------
+// A backup can only ever be sent to the platform this site paired with.
+// --------------------------------------------------------------------------------------------------
+//
+// The most valuable thing an attacker could do with a compromised platform is ask every managed site
+// for its database and have it delivered somewhere else. That is prevented structurally rather than by
+// validation: the upload destination is read from the stored connection record, and there is no
+// argument, parameter or payload field anywhere in the path that could replace it.
+//
+// So this check is about the *absence* of a seam. If somebody later adds a destination argument for
+// convenience, this fails and they have to come and read this comment.
+$checks++;
+
+$backupRunner = sourceWithoutComments($sourceDir.'/services/BackupRunner.php');
+
+if (! str_contains($client, '$record->platformUrl')) {
+    $failures[] = 'src/services/Client.php no longer sends uploads to the paired platform URL; check where they go instead (invariants 4, 5 and 8).';
+}
+
+// putFile takes a path on this server and a hash, and nothing that names a destination host.
+if (preg_match('/function putFile\((.*?)\)/s', $client, $signature) !== 1) {
+    $failures[] = 'src/services/Client.php no longer defines putFile(); the artifact upload path has changed.';
+} else {
+    foreach (['url', 'host', 'endpoint', 'destination', 'bucket'] as $forbidden) {
+        if (stripos($signature[1], $forbidden) !== false) {
+            $failures[] = "src/services/Client.php putFile() accepts a '{$forbidden}' argument; an artifact destination must never be a parameter (invariant 8).";
+        }
+    }
+}
+
+// The runner must not read a destination out of the job either.
+foreach (['$parameters[\'url', '$parameters[\'endpoint', '$job[\'url', '$declared[\'url'] as $forbidden) {
+    if (str_contains($backupRunner, $forbidden)) {
+        $failures[] = 'src/services/BackupRunner.php reads a destination from a job payload (invariant 8).';
+    }
+}
+
+// No shell. Craft's own backup uses the site's existing connection; composing a dump command here
+// would be arbitrary execution wearing a backup's clothes.
+foreach (['exec(', 'shell_exec', 'passthru', 'proc_open', 'popen', 'mysqldump', 'pg_dump'] as $forbidden) {
+    if (str_contains($backupRunner, $forbidden)) {
+        $failures[] = "src/services/BackupRunner.php contains '{$forbidden}'; the dump must go through Craft's own backup (invariant 8).";
+    }
+}
+
+// An unencrypted artifact must never be uploaded, so a missing platform key has to be fatal.
+if (! str_contains($backupRunner, 'the platform has no artifact encryption key configured')) {
+    $failures[] = 'src/services/BackupRunner.php no longer refuses to proceed without an encryption key; a backup must never travel unencrypted.';
+}
+
+// The plaintext dump and the encrypted artifact must both be removed whatever happened, which means
+// inside a finally rather than at the end of the happy path. Matched as a shape instead of merely
+// checking that shred() is called somewhere: it is also called on the early-return paths, so a looser
+// check would pass with the finally block deleted entirely.
+if (preg_match('~finally\s*\{.{0,400}?shred\(\$dump.{0,300}?shred\(\$encrypted~s', $backupRunner) !== 1) {
+    $failures[] = 'src/services/BackupRunner.php no longer removes both the dump and the artifact in a finally block; a failed backup must not leave a copy of the database on disk.';
 }
 
 // --------------------------------------------------------------------------------------------------

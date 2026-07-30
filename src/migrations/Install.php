@@ -44,6 +44,12 @@ class Install extends Migration
             // sends is verified against this before it is acted on.
             'platformPublicKey' => $this->string(64)->notNull(),
 
+            // The platform's X25519 encryption key, separate from the signing key above and used
+            // only to seal a backup artifact's key. Nullable: a platform with no backup key
+            // configured tells us nothing, and a connector that was told nothing seals nothing
+            // rather than guessing.
+            'platformBackupPublicKey' => $this->string(64),
+
             'capabilities' => $this->text(),
             'state' => $this->string(32)->notNull()->defaultValue(ConnectionRecord::STATE_ACTIVE),
             'pairedAt' => $this->dateTime(),

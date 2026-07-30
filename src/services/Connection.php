@@ -14,6 +14,7 @@ namespace coyshdigital\managerconnector\services;
 use Craft;
 use coyshdigital\managerconnector\records\ConnectionRecord;
 use coyshdigital\managerprotocol\Keys;
+use coyshdigital\managerprotocol\Sealing;
 use craft\base\Component;
 use DateTime;
 use RuntimeException;
@@ -86,6 +87,7 @@ class Connection extends Component
         string $platformPublicKey,
         array $capabilities,
         string $state,
+        ?string $platformBackupPublicKey = null,
     ): ConnectionRecord {
         $record = $this->current() ?? new ConnectionRecord();
 
@@ -94,6 +96,7 @@ class Connection extends Component
         $record->publicKey = $keypair['public'];
         $record->secretKey = $this->encrypt($keypair['secret']);
         $record->platformPublicKey = $platformPublicKey;
+        $record->platformBackupPublicKey = $platformBackupPublicKey;
         $record->capabilities = json_encode($capabilities, JSON_THROW_ON_ERROR);
         $record->state = $state;
         $record->pairedAt = new DateTime();
@@ -180,6 +183,59 @@ class Connection extends Component
             'Manager Connector capabilities updated to: '.(implode(', ', $capabilities) ?: 'none'),
             'manager-connector',
         );
+
+        return true;
+    }
+
+    /**
+     * The key artifacts are sealed to, if the platform has one.
+     */
+    public function backupPublicKey(): ?string
+    {
+        $record = $this->current();
+
+        $key = $record?->platformBackupPublicKey;
+
+        return is_string($key) && $key !== '' ? $key : null;
+    }
+
+    /**
+     * Adopt the artifact encryption key the platform reports.
+     *
+     * Same rule as {@see self::updateCapabilities()}, and for the same reason: only ever called with a
+     * value that arrived on a signature-verified response. Sealing an artifact key to something handed
+     * over by whatever sits between this site and the platform would mean encrypting a customer
+     * database to an attacker's key and calling it protected.
+     *
+     * @return bool whether anything changed
+     */
+    public function updateBackupPublicKey(?string $publicKey): bool
+    {
+        $record = $this->current();
+
+        if ($record === null) {
+            return false;
+        }
+
+        // Refused rather than stored if it is not a well-formed key. A malformed value would fail at
+        // seal time instead, in the middle of a backup that has already dumped the database.
+        if ($publicKey !== null && ! Sealing::isValidBoxPublicKey($publicKey)) {
+            Craft::warning(
+                'Manager Connector refused a malformed artifact encryption key.',
+                'manager-connector',
+            );
+
+            return false;
+        }
+
+        if ($record->platformBackupPublicKey === $publicKey) {
+            return false;
+        }
+
+        $record->platformBackupPublicKey = $publicKey;
+        $record->save(false);
+
+        $this->cached = $record;
 
         return true;
     }

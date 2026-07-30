@@ -66,6 +66,27 @@
                     {% endif %}
                 </td>
             </tr>
+            {% if 'backups:create' in capabilities %}
+                <tr>
+                    <th scope="row">{{ "Backups"|t('manager-connector') }}</th>
+                    <td>
+                        {% if connection.platformBackupPublicKey %}
+                            <p>
+                                {{ "This site may be asked to take a database backup. Each one is encrypted here, with a key generated on this server and sealed to the platform, before it is uploaded."|t('manager-connector') }}
+                            </p>
+                            <p class="light">
+                                {{ "The plaintext dump is deleted as soon as it has been encrypted. Backups are uploaded to the platform this site is paired with and nowhere else; no instruction from the platform can change where they go."|t('manager-connector') }}
+                            </p>
+                        {% else %}
+                            {# Permission without a key means no backup will be attempted. Said plainly,
+                               because the alternative is an operator wondering why nothing happens. #}
+                            <p class="error">
+                                {{ "Permission has been granted, but the platform has not published an artifact encryption key. No backup will be taken until it does — an unencrypted database will never be uploaded."|t('manager-connector') }}
+                            </p>
+                        {% endif %}
+                    </td>
+                </tr>
+            {% endif %}
             <tr>
                 <th scope="row">{{ "Last successful connection"|t('manager-connector') }}</th>
                 <td>{{ connection.lastSuccessAt ? connection.lastSuccessAt|datetime('short') : "Never"|t('manager-connector') }}</td>

@@ -76,6 +76,12 @@ class PairController extends BaseController
             platformPublicKey: (string) ($response['platform_public_key'] ?? ''),
             capabilities: $response['capabilities'] ?? [],
             state: $isLive ? ConnectionRecord::STATE_ACTIVE : ConnectionRecord::STATE_PENDING_CONFIRMATION,
+
+            // Null when the platform has no backup key configured. Stored from this verified response
+            // and refreshed from every later one, so a rotation follows automatically.
+            platformBackupPublicKey: is_string($response['backup_public_key'] ?? null) && $response['backup_public_key'] !== ''
+                ? (string) $response['backup_public_key']
+                : null,
         );
 
         if (! $isLive) {

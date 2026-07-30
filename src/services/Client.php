@@ -181,6 +181,118 @@ class Client extends Component
     }
 
     /**
+     * Upload a file to the platform as a signed streaming PUT.
+     *
+     * Two things make this different from {@see self::post()}, and both matter.
+     *
+     * The signature covers a hash of the file declared in a header rather than a body held in memory.
+     * A database backup cannot be read into a string to be signed — on a site large enough to need
+     * managing, that is the request that exhausts PHP's memory limit.
+     *
+     * And the destination is not a parameter. It is `$record->platformUrl`, stored at pairing and
+     * changeable only by re-pairing, which is itself an explicit and audited act. There is no argument
+     * to this method that could redirect an artifact somewhere else, which is the point: a compromised
+     * platform can ask for a backup, but it cannot ask for one to be sent elsewhere.
+     *
+     * @return array<string, mixed>
+     */
+    public function putFile(string $path, string $filePath, string $contentHash): array
+    {
+        $connection = Plugin::getInstance()->connection;
+        $record = $connection->current();
+
+        if ($record === null) {
+            throw new RuntimeException('This site is not paired with a Manager platform.');
+        }
+
+        $bytes = filesize($filePath);
+
+        if ($bytes === false || $bytes <= 0) {
+            throw new RuntimeException('There is nothing to upload.');
+        }
+
+        $timestamp = time();
+        $nonce = Nonce::generate();
+
+        $canonical = CanonicalRequest::forStream(
+            siteId: $record->siteIdentifier,
+            connectorVersion: Plugin::VERSION,
+            timestamp: $timestamp,
+            nonce: $nonce,
+            method: 'PUT',
+            path: $path,
+            bodyHash: $contentHash,
+        );
+
+        $secret = $connection->secretKey();
+
+        try {
+            $signature = $canonical->sign($secret);
+        } finally {
+            sodium_memzero($secret);
+        }
+
+        $handle = fopen($filePath, 'rb');
+
+        if ($handle === false) {
+            throw new RuntimeException('Could not open the artifact for upload.');
+        }
+
+        $settings = Plugin::getInstance()->getSettings();
+
+        try {
+            $client = Craft::createGuzzleClient([
+                // Longer than an ordinary request, because this one is measured in megabytes rather
+                // than milliseconds. Still bounded: an upload that stalls has to end eventually.
+                'timeout' => $settings->uploadTimeout,
+                'connect_timeout' => $settings->timeout,
+                'http_errors' => false,
+            ]);
+
+            $response = $client->put(rtrim($record->platformUrl, '/').$path, [
+                // Guzzle streams from the handle rather than buffering it.
+                'body' => $handle,
+                'headers' => [
+                    Protocol::HEADER_SITE => $record->siteIdentifier,
+                    Protocol::HEADER_TIMESTAMP => (string) $timestamp,
+                    Protocol::HEADER_NONCE => $nonce,
+                    Protocol::HEADER_CONNECTOR_VERSION => Plugin::VERSION,
+                    Protocol::HEADER_SIGNATURE => Protocol::SIGNATURE_SCHEME.'='.$signature,
+                    Protocol::HEADER_CONTENT_SHA256 => $contentHash,
+
+                    // Declared so the platform can refuse an oversized upload before reading it. Sent
+                    // explicitly because a streamed body would otherwise go out chunked, with no length
+                    // for the platform to check.
+                    'Content-Length' => (string) $bytes,
+                    'Content-Type' => 'application/octet-stream',
+                    'Accept' => 'application/json',
+                    'User-Agent' => 'ManagerConnector/'.Plugin::VERSION.' (Craft)',
+                ],
+            ]);
+        } catch (GuzzleException $e) {
+            throw new RuntimeException('Could not upload to the Manager platform: '.$e->getMessage(), 0, $e);
+        } finally {
+            if (is_resource($handle)) {
+                fclose($handle);
+            }
+        }
+
+        $decoded = $this->decode((string) $response->getBody());
+
+        if ($response->getStatusCode() >= 400) {
+            throw new RuntimeException(sprintf(
+                'The platform rejected the artifact (HTTP %d). Correlation ID: %s',
+                $response->getStatusCode(),
+                $decoded['correlation_id'] ?? 'unknown',
+            ));
+        }
+
+        $connection->recordSuccess();
+
+        return $decoded;
+    }
+
+    /**
      * @param  array<string, string>  $headers
      * @return array{status: int, body: string, headers: array<string, list<string>>}
      */

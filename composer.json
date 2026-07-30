@@ -52,7 +52,8 @@
             "client": "coyshdigital\\managerconnector\\services\\Client",
             "reporter": "coyshdigital\\managerconnector\\services\\Reporter",
             "updates": "coyshdigital\\managerconnector\\services\\UpdatesReporter",
-            "jobs": "coyshdigital\\managerconnector\\services\\JobRunner"
+            "jobs": "coyshdigital\\managerconnector\\services\\JobRunner",
+            "backups": "coyshdigital\\managerconnector\\services\\BackupRunner"
         }
     },
     "config": {

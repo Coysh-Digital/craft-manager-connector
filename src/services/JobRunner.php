@@ -55,6 +55,15 @@ class JobRunner extends Component
             $plugin->connection->updateCapabilities(array_values($response['capabilities']));
         }
 
+        // Same rule, same reason: security-sensitive configuration, adopted only from a verified
+        // response. Without this the connector would never learn a rotated artifact encryption key,
+        // and every backup after a rotation would be sealed to a key the platform no longer holds.
+        if (array_key_exists('backup_public_key', $response)) {
+            $key = $response['backup_public_key'];
+
+            $plugin->connection->updateBackupPublicKey(is_string($key) && $key !== '' ? $key : null);
+        }
+
         /** @var list<array<string, mixed>> $jobs */
         $jobs = $response['jobs'] ?? [];
 
@@ -84,7 +93,7 @@ class JobRunner extends Component
             }
 
             try {
-                $result = $this->handle($type, $job['parameters'] ?? []);
+                $result = $this->handle($type, $id, $job['parameters'] ?? []);
 
                 $this->report($id, true, $result);
                 $tally['succeeded']++;
@@ -113,6 +122,7 @@ class JobRunner extends Component
         return in_array($type, [
             Jobs::INVENTORY_REFRESH,
             Jobs::UPDATES_CHECK,
+            Jobs::BACKUP_CREATE,
         ], true);
     }
 
@@ -125,11 +135,15 @@ class JobRunner extends Component
      * @param  array<string, mixed>  $parameters
      * @return array<string, mixed>
      */
-    private function handle(string $type, array $parameters): array
+    private function handle(string $type, string $jobId, array $parameters): array
     {
         return match ($type) {
             Jobs::INVENTORY_REFRESH => $this->refreshInventory(),
             Jobs::UPDATES_CHECK => $this->checkUpdates($parameters),
+
+            // The job identifier is passed, not a destination. Everything the backup needs to know
+            // about where it is going comes from the connection record.
+            Jobs::BACKUP_CREATE => Plugin::getInstance()->backups->run($jobId),
             // Unreachable: canHandle() gates this. Present so adding a constant without a handler
             // fails loudly rather than silently doing nothing.
             default => throw new \LogicException("No handler for '{$type}'."),

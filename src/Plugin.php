@@ -15,6 +15,7 @@ use Craft;
 use coyshdigital\managerconnector\models\Settings;
 use coyshdigital\managerconnector\services\Client;
 use coyshdigital\managerconnector\services\Connection;
+use coyshdigital\managerconnector\services\BackupRunner;
 use coyshdigital\managerconnector\services\JobRunner;
 use coyshdigital\managerconnector\services\Reporter;
 use coyshdigital\managerconnector\services\UpdatesReporter;
@@ -46,6 +47,7 @@ use craft\helpers\UrlHelper;
  * @property-read Reporter $reporter
  * @property-read UpdatesReporter $updates
  * @property-read JobRunner $jobs
+ * @property-read BackupRunner $backups
  *
  * @author Coysh Digital
  *
@@ -56,12 +58,12 @@ class Plugin extends BasePlugin
     /**
      * @var string The connector version reported to the platform and signed into every request.
      */
-    public const VERSION = '1.1.0';
+    public const VERSION = '1.2.0';
 
     /**
      * @inheritdoc
      */
-    public string $schemaVersion = '1.0.0';
+    public string $schemaVersion = '1.1.0';
 
     /**
      * @inheritdoc

@@ -45,6 +45,25 @@ class Settings extends Model
     public int $timeout = 10;
 
     /**
+     * @var int Seconds to wait while uploading a backup artifact.
+     *
+     * Separate from the ordinary timeout, and much longer, because this one is measured in megabytes
+     * rather than milliseconds. Still bounded: an upload that has stalled has to end eventually, and a
+     * connector holding a socket open indefinitely is a connector holding a PHP process open
+     * indefinitely.
+     */
+    public int $uploadTimeout = 900;
+
+    /**
+     * @var int Largest database this connector will attempt to back up, in megabytes.
+     *
+     * A safety valve rather than a policy. Dumping a database far larger than expected is how a backup
+     * job fills a disk on a production site, and failing early with a clear message beats failing late
+     * with a full volume.
+     */
+    public int $maxBackupMegabytes = 2048;
+
+    /**
      * @inheritdoc
      */
     public function defineRules(): array
@@ -53,6 +72,8 @@ class Settings extends Model
             [['platformUrl'], 'string'],
             [['platformUrl'], 'url', 'defaultScheme' => 'https'],
             [['timeout'], 'integer', 'min' => 1, 'max' => 60],
+            [['uploadTimeout'], 'integer', 'min' => 30, 'max' => 7200],
+            [['maxBackupMegabytes'], 'integer', 'min' => 1, 'max' => 10240],
             [['useQueue'], 'boolean'],
         ];
     }
