@@ -1,10 +1,15 @@
 # Manager Connector for Craft CMS
 
-Reports operational metadata from a Craft CMS 5 installation to a [Manager](https://coysh.digital/manager)
-platform over signed, outbound-only requests.
+Reports operational metadata from a Craft CMS 5 installation to a
+[Manager](https://managerforcraft.com) platform over signed, outbound-only requests.
 
-This plugin is privileged code running inside your production website, so it is published in full
-and kept deliberately small. Read it before you install it — that is what it is here for.
+**MIT licensed.** This plugin is privileged code running inside your production website, so it is
+published in full, kept deliberately small, and licensed permissively: it sits in your codebase next
+to your own work, and a copyleft licence there would raise a question you should never have to put to
+a lawyer before you can monitor your own websites. Read it before you install it. That is what it is
+here for.
+
+Requires PHP 8.2+ and Craft CMS 5.0+.
 
 ## What it does
 
@@ -40,9 +45,8 @@ php craft manager-connector/preview
 
 ## Documentation
 
-Full documentation lives in the [`docs`](docs/) folder, and is published at
-[coysh.digital/plugins/manager-connector/docs](https://coysh.digital/plugins/manager-connector/docs/).
-This README is the short version; the docs go deeper on pairing, exactly what is
+Full documentation lives in the [`docs`](docs/) folder of this repository. This README is the short
+version; the docs go deeper on pairing, exactly what is
 and is not sent, what each capability permits, how backups work, the security
 model, the console commands, and troubleshooting.
 
@@ -129,5 +133,15 @@ stops expecting it.
 
 Report vulnerabilities privately to hello@coysh.digital. Please do not open a public issue.
 
-Requires PHP 8.2+ and Craft CMS 5.0+. Dependencies are limited to the shared protocol package and
-PHP's own `sodium` extension; HTTP goes through the Guzzle client Craft already ships.
+Dependencies are limited to the shared protocol package and PHP's own `sodium` extension; HTTP goes
+through the Guzzle client Craft already ships.
+
+## Licence
+
+**MIT.** See [LICENSE.md](LICENSE.md).
+
+Permissive on purpose. This plugin is installed into other people's codebases, so the licence should
+never be a reason to hesitate. The control plane it reports to is
+[AGPL-3.0-or-later](https://github.com/Coysh-Digital/manager), and the
+[wire protocol](https://github.com/Coysh-Digital/manager-protocol) between them is MIT, so the whole
+contract can be read, verified or reimplemented by anyone.
