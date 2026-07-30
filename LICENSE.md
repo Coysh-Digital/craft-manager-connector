@@ -1,29 +1,38 @@
 # Licence
 
+**The Manager connector is free software, licensed under the MIT licence.**
+
 Copyright (c) Coysh Digital.
 
-This plugin is **source-available**, on terms equivalent to Manager itself. The source is published so
-that it can be reviewed before being installed on a production website, and so that its security
-properties can be verified independently — which matters more here than anywhere else in Manager,
-because this is the part that runs inside somebody else's site.
+Permission is hereby granted, free of charge, to any person obtaining a copy of this software and
+associated documentation files (the "Software"), to deal in the Software without restriction,
+including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense
+and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
+subject to the following condition:
 
-## What you may do
+The above copyright notice and this permission notice shall be included in all copies or substantial
+portions of the Software.
 
-You may use, copy, modify and run this plugin, at no cost, on websites that you or your organisation
-operate or are contracted to maintain, with any Manager installation — self-hosted or Manager Cloud.
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT
+LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
+WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-You may publish and share your modifications.
+## Why MIT here, when the control plane is AGPL
 
-## What you may not do
+This plugin gets installed inside somebody else's Craft installation, alongside their own code. A
+copyleft licence in that position raises a question a customer should never have to put to their
+lawyer before they can monitor their own websites. MIT removes the question entirely.
 
-You may not offer this plugin, or a derivative of it, as part of a hosted or managed fleet-management
-service provided to third parties. That is Manager Cloud.
+The control plane it talks to is [AGPL-3.0-or-later](https://github.com/Coysh-Digital/manager), and
+the [protocol between them](https://github.com/Coysh-Digital/manager-protocol) is MIT, so the whole
+wire contract can be read, verified or reimplemented by anyone.
 
-## No warranty
+## Before you install it
 
-Provided "as is", without warranty of any kind. See the platform licence for the full disclaimer.
-
-## Reporting a security issue
-
-Privately, to **hello@coysh.digital**. Please do not open a public issue. See
-[SECURITY.md](SECURITY.md).
+The source is published so it can be reviewed before it goes anywhere near a production website. It
+is worth actually doing that: this plugin runs with your Craft installation's privileges. It makes
+only outbound requests, it exposes no inbound management endpoint, and every capability it will act
+on is granted explicitly. All three of those claims are readable in this repository rather than
+asserted here.

@@ -11,10 +11,10 @@ declare(strict_types=1);
 
 namespace coyshdigital\managerconnector\services;
 
-use Craft;
 use coyshdigital\managerconnector\Plugin;
 use coyshdigital\managerprotocol\InventorySections;
 use coyshdigital\managerprotocol\SchemaValidator;
+use Craft;
 use craft\base\Component;
 use Throwable;
 
@@ -68,18 +68,18 @@ class Reporter extends Component
         ];
 
         foreach ([
-            'plugins' => fn (): array => $this->plugins(),
-            'composer_packages' => fn (): array => $this->composerPackages(),
-            'config_flags' => fn (): array => $this->configFlags(),
-            'queue' => fn (): array => $this->queue(),
-            'migrations' => fn (): array => $this->migrations(),
-            'licence' => fn (): array => $this->licence(),
+            'plugins' => fn(): array => $this->plugins(),
+            'composer_packages' => fn(): array => $this->composerPackages(),
+            'config_flags' => fn(): array => $this->configFlags(),
+            'queue' => fn(): array => $this->queue(),
+            'migrations' => fn(): array => $this->migrations(),
+            'licence' => fn(): array => $this->licence(),
         ] as $key => $reader) {
             $capability = InventorySections::capabilityFor($key);
 
             // Not collected at all without the capability. Reading licence state for a site that
             // never granted licences:read, only to discard it, would still be reading it.
-            if ($capability !== null && ! in_array($capability, $granted, true)) {
+            if ($capability !== null && !in_array($capability, $granted, true)) {
                 continue;
             }
 
@@ -120,7 +120,7 @@ class Reporter extends Component
             'edition' => $this->editionHandle(),
         ];
 
-        $schemaVersion = $this->safely(static fn (): string => $info->schemaVersion, '');
+        $schemaVersion = $this->safely(static fn(): string => $info->schemaVersion, '');
 
         if ($schemaVersion !== '') {
             $craft['schema_version'] = $schemaVersion;
@@ -138,7 +138,7 @@ class Reporter extends Component
      */
     private function editionHandle(): string
     {
-        return $this->safely(static function (): string {
+        return $this->safely(static function(): string {
             $edition = Craft::$app->edition;
 
             if (is_object($edition) && method_exists($edition, 'handle')) {
@@ -163,7 +163,7 @@ class Reporter extends Component
     private function database(): array
     {
         $db = Craft::$app->getDb();
-        $version = $this->safely(static fn (): string => $db->getServerVersion(), '');
+        $version = $this->safely(static fn(): string => $db->getServerVersion(), '');
 
         $engine = $db->getIsPgsql() ? 'pgsql' : 'mysql';
 
@@ -190,7 +190,7 @@ class Reporter extends Component
         $plugins = [];
 
         foreach (Craft::$app->getPlugins()->getAllPluginInfo() as $handle => $info) {
-            if (! is_array($info)) {
+            if (!is_array($info)) {
                 continue;
             }
 
@@ -214,22 +214,22 @@ class Reporter extends Component
      */
     private function composerPackages(): array
     {
-        $path = Craft::getAlias('@root').'/composer.lock';
+        $path = Craft::getAlias('@root') . '/composer.lock';
 
-        if (! is_string($path) || ! is_file($path) || ! is_readable($path)) {
+        if (!is_string($path) || !is_file($path) || !is_readable($path)) {
             return [];
         }
 
         $decoded = json_decode((string) file_get_contents($path), true);
 
-        if (! is_array($decoded)) {
+        if (!is_array($decoded)) {
             return [];
         }
 
         $packages = [];
 
         foreach ($decoded['packages'] ?? [] as $package) {
-            if (! is_array($package) || ! isset($package['name'], $package['version'])) {
+            if (!is_array($package) || !isset($package['name'], $package['version'])) {
                 continue;
             }
 
@@ -277,9 +277,9 @@ class Reporter extends Component
         $queue = Craft::$app->getQueue();
 
         return [
-            'pending' => $this->safely(static fn (): int => (int) $queue->getTotalWaiting(), 0),
-            'reserved' => $this->safely(static fn (): int => (int) $queue->getTotalReserved(), 0),
-            'failed' => $this->safely(static fn (): int => (int) $queue->getTotalFailed(), 0),
+            'pending' => $this->safely(static fn(): int => (int) $queue->getTotalWaiting(), 0),
+            'reserved' => $this->safely(static fn(): int => (int) $queue->getTotalReserved(), 0),
+            'failed' => $this->safely(static fn(): int => (int) $queue->getTotalFailed(), 0),
         ];
     }
 
@@ -290,7 +290,7 @@ class Reporter extends Component
     {
         return [
             'pending' => $this->safely(
-                static fn (): int => count(Craft::$app->getContentMigrator()->getNewMigrations()),
+                static fn(): int => count(Craft::$app->getContentMigrator()->getNewMigrations()),
                 0,
             ),
         ];
@@ -310,7 +310,7 @@ class Reporter extends Component
         $trials = 0;
 
         foreach ($plugins->getAllPluginInfo() as $handle => $info) {
-            if (! is_array($info) || ($info['licenseKey'] ?? null) === null) {
+            if (!is_array($info) || ($info['licenseKey'] ?? null) === null) {
                 continue;
             }
 
@@ -337,7 +337,7 @@ class Reporter extends Component
 
     private function craftLicenceState(): string
     {
-        return $this->safely(static function (): string {
+        return $this->safely(static function(): string {
             $status = (string) Craft::$app->getCache()->get('licenseKeyStatus');
 
             return match ($status) {
@@ -390,7 +390,7 @@ class Reporter extends Component
             return $reader();
         } catch (Throwable $e) {
             Craft::warning(
-                'Manager Connector could not read a field: '.$e->getMessage(),
+                'Manager Connector could not read a field: ' . $e->getMessage(),
                 'manager-connector',
             );
 

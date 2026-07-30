@@ -26,7 +26,7 @@ class m260730_120000_add_backup_public_key extends Migration
 {
     public function safeUp(): bool
     {
-        if (! $this->db->columnExists(ConnectionRecord::tableName(), 'platformBackupPublicKey')) {
+        if (!$this->db->columnExists(ConnectionRecord::tableName(), 'platformBackupPublicKey')) {
             $this->addColumn(
                 ConnectionRecord::tableName(),
                 'platformBackupPublicKey',

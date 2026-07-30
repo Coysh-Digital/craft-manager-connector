@@ -11,9 +11,9 @@ declare(strict_types=1);
 
 namespace coyshdigital\managerconnector\jobs;
 
-use Craft;
 use coyshdigital\managerconnector\Plugin;
 use coyshdigital\managerconnector\services\Tasks;
+use Craft;
 use craft\queue\BaseJob;
 use Throwable;
 
@@ -37,7 +37,7 @@ class RunTask extends BaseJob
 
     public function execute($queue): void
     {
-        if (! Tasks::isKnown($this->task)) {
+        if (!Tasks::isKnown($this->task)) {
             // Refused rather than attempted. Failing loudly here is right: something has put a value in
             // this payload that this plugin never generates.
             throw new \RuntimeException("'{$this->task}' is not a task this connector implements.");
@@ -52,7 +52,7 @@ class RunTask extends BaseJob
             // warrant a custom retry policy, and one missed heartbeat is visible in Manager as a gap
             // rather than as an outage.
             Craft::warning(
-                "Manager Connector {$this->task} failed: ".$e->getMessage(),
+                "Manager Connector {$this->task} failed: " . $e->getMessage(),
                 'manager-connector',
             );
 

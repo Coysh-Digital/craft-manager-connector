@@ -11,10 +11,11 @@ declare(strict_types=1);
 
 namespace coyshdigital\managerconnector\services;
 
-use Craft;
 use coyshdigital\managerconnector\records\ConnectionRecord;
 use coyshdigital\managerprotocol\Keys;
+use coyshdigital\managerprotocol\Protocol;
 use coyshdigital\managerprotocol\Sealing;
+use Craft;
 use craft\base\Component;
 use DateTime;
 use RuntimeException;
@@ -103,8 +104,8 @@ class Connection extends Component
         $record->keyRotatedAt = new DateTime();
         $record->connectorVersion = \coyshdigital\managerconnector\Plugin::VERSION;
 
-        if (! $record->save()) {
-            throw new RuntimeException('Could not store the Manager connection: '.json_encode($record->getErrors()));
+        if (!$record->save()) {
+            throw new RuntimeException('Could not store the Manager connection: ' . json_encode($record->getErrors()));
         }
 
         $this->cached = $record;
@@ -180,7 +181,60 @@ class Connection extends Component
         $this->cached = $record;
 
         Craft::info(
-            'Manager Connector capabilities updated to: '.(implode(', ', $capabilities) ?: 'none'),
+            'Manager Connector capabilities updated to: ' . (implode(', ', $capabilities) ?: 'none'),
+            'manager-connector',
+        );
+
+        return true;
+    }
+
+    /**
+     * The artifact format this site has committed to.
+     *
+     * A ratchet, and the only downgrade control that survives the platform being the adversary. Every
+     * other defence is something the platform participates in and can therefore decline to perform;
+     * this is a value in this site's own database, raised by this site's own code.
+     */
+    public function backupFormatFloor(): string
+    {
+        $record = $this->current();
+
+        $floor = $record?->backupFormatFloor;
+
+        return $floor === Protocol::BACKUP_FORMAT_V2
+            ? Protocol::BACKUP_FORMAT_V2
+            : Protocol::BACKUP_FORMAT_V1;
+    }
+
+    /**
+     * Commit this site to the zero-knowledge format, permanently.
+     *
+     * There is no counterpart. Lowering the floor means going back to backups the platform can read,
+     * and that must require editing a file on this server rather than receiving a response.
+     *
+     * @return bool whether anything changed
+     */
+    public function raiseBackupFormatFloor(): bool
+    {
+        $record = $this->current();
+
+        if ($record === null || $record->backupFormatFloor === Protocol::BACKUP_FORMAT_V2) {
+            return false;
+        }
+
+        $record->backupFormatFloor = Protocol::BACKUP_FORMAT_V2;
+
+        // The platform's own artifact key is discarded at the same moment. Keeping it would leave a
+        // usable value in the row for a code path that no longer exists, and the absence of it is a
+        // second, independent reason a v1 backup cannot happen here.
+        $record->platformBackupPublicKey = null;
+
+        $record->save(false);
+
+        $this->cached = $record;
+
+        Craft::info(
+            'Manager Connector will now encrypt backups only to this organisation\'s own recovery keys.',
             'manager-connector',
         );
 
@@ -192,6 +246,13 @@ class Connection extends Component
      */
     public function backupPublicKey(): ?string
     {
+        // Above the floor there is no such key, whatever the column says. Read defensively rather than
+        // relying on the column having been cleared, so that a row edited by hand cannot resurrect a
+        // code path this site has committed to leaving behind.
+        if ($this->backupFormatFloor() === Protocol::BACKUP_FORMAT_V2) {
+            return null;
+        }
+
         $record = $this->current();
 
         $key = $record?->platformBackupPublicKey;
@@ -217,9 +278,24 @@ class Connection extends Component
             return false;
         }
 
+        if ($this->backupFormatFloor() === Protocol::BACKUP_FORMAT_V2) {
+            // Above the floor this is a no-op, and a loud one. A platform sending an artifact key to a
+            // site that has committed to recovery keys is either running old code or attempting a
+            // downgrade, and both are worth a line in the log.
+            if ($publicKey !== null) {
+                Craft::warning(
+                    'Manager Connector ignored an artifact encryption key: this site encrypts backups '
+                    . 'only to its own recovery keys.',
+                    'manager-connector',
+                );
+            }
+
+            return false;
+        }
+
         // Refused rather than stored if it is not a well-formed key. A malformed value would fail at
         // seal time instead, in the middle of a backup that has already dumped the database.
-        if ($publicKey !== null && ! Sealing::isValidBoxPublicKey($publicKey)) {
+        if ($publicKey !== null && !Sealing::isValidBoxPublicKey($publicKey)) {
             Craft::warning(
                 'Manager Connector refused a malformed artifact encryption key.',
                 'manager-connector',

@@ -1,7 +1,7 @@
 {
     "name": "coysh-digital/craft-manager-connector",
     "description": "Reports operational metadata from a Craft CMS installation to a Manager platform over signed, outbound-only requests.",
-    "version": "1.5.0",
+    "version": "1.7.0",
     "type": "craft-plugin",
     "keywords": [
         "craft",
@@ -11,7 +11,7 @@
         "monitoring",
         "manager"
     ],
-    "license": "proprietary",
+    "license": "MIT",
     "support": {
         "email": "hello@coysh.digital",
         "issues": "https://github.com/Coysh-Digital/craft-manager-connector/issues",
@@ -28,7 +28,7 @@
         "php": ">=8.2",
         "ext-sodium": "*",
         "craftcms/cms": "^5.0.0",
-        "coysh-digital/manager-protocol": "^1.0"
+        "coysh-digital/manager-protocol": "^1.2"
     },
     "require-dev": {
         "craftcms/ecs": "dev-main",
@@ -54,8 +54,12 @@
             "updates": "coyshdigital\\managerconnector\\services\\UpdatesReporter",
             "jobs": "coyshdigital\\managerconnector\\services\\JobRunner",
             "backups": "coyshdigital\\managerconnector\\services\\BackupRunner",
+            "recipientPin": "coyshdigital\\managerconnector\\services\\RecipientPin",
             "tasks": "coyshdigital\\managerconnector\\services\\Tasks",
-            "scheduler": "coyshdigital\\managerconnector\\services\\Scheduler"
+            "scheduler": "coyshdigital\\managerconnector\\services\\Scheduler",
+            "system": "coyshdigital\\managerconnector\\services\\SystemReporter",
+            "logins": "coyshdigital\\managerconnector\\services\\LoginsReporter",
+            "responseSampler": "coyshdigital\\managerconnector\\services\\ResponseSampler"
         }
     },
     "config": {

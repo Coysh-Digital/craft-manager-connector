@@ -11,12 +11,12 @@ declare(strict_types=1);
 
 namespace coyshdigital\managerconnector\services;
 
-use Craft;
 use coyshdigital\managerconnector\Plugin;
 use coyshdigital\managerprotocol\CanonicalRequest;
 use coyshdigital\managerprotocol\CanonicalResponse;
 use coyshdigital\managerprotocol\Nonce;
 use coyshdigital\managerprotocol\Protocol;
+use Craft;
 use craft\base\Component;
 use GuzzleHttp\Exception\GuzzleException;
 use RuntimeException;
@@ -68,14 +68,14 @@ class Client extends Component
         if ($response['status'] !== 200) {
             throw new RuntimeException(
                 'Pairing was refused by the platform. Correlation ID: '
-                .($decoded['correlation_id'] ?? 'unknown')
+                . ($decoded['correlation_id'] ?? 'unknown')
             );
         }
 
         $platformPublicKey = $decoded['platform_public_key'] ?? null;
         $signature = $this->signatureFrom($response['headers']);
 
-        if (! is_string($platformPublicKey) || $signature === null) {
+        if (!is_string($platformPublicKey) || $signature === null) {
             throw new RuntimeException('The platform did not return a signed pairing response.');
         }
 
@@ -88,7 +88,7 @@ class Client extends Component
 
         // Trust-on-first-use, but verified: the response has to be signed by the key it is
         // offering, and bound to the nonce this request chose.
-        if (! $canonical->verify($signature, $platformPublicKey)) {
+        if (!$canonical->verify($signature, $platformPublicKey)) {
             throw new RuntimeException(
                 'The pairing response failed signature verification. Someone may be intercepting this connection.'
             );
@@ -141,7 +141,7 @@ class Client extends Component
             Protocol::HEADER_TIMESTAMP => (string) $timestamp,
             Protocol::HEADER_NONCE => $nonce,
             Protocol::HEADER_CONNECTOR_VERSION => Plugin::VERSION,
-            Protocol::HEADER_SIGNATURE => Protocol::SIGNATURE_SCHEME.'='.$signature,
+            Protocol::HEADER_SIGNATURE => Protocol::SIGNATURE_SCHEME . '=' . $signature,
         ]);
 
         $decoded = $this->decode($response['body']);
@@ -171,10 +171,10 @@ class Client extends Component
                 body: $response['body'],
             );
 
-            if ($signature === null || ! $canonical->verify($signature, $record->platformPublicKey)) {
+            if ($signature === null || !$canonical->verify($signature, $record->platformPublicKey)) {
                 throw new RuntimeException(
                     'The platform response failed signature verification and was discarded. '
-                    .'Someone may be intercepting this connection.'
+                    . 'Someone may be intercepting this connection.'
                 );
             }
         }
@@ -200,6 +200,113 @@ class Client extends Component
      *
      * @return array<string, mixed>
      */
+    /**
+     * Upload an artifact straight to object storage, using a grant the platform issued.
+     *
+     * The grant carries a path, a query string and headers. **It does not carry a host, and this method
+     * has no parameter that could accept one.** The URL is assembled from `backupUploadHost` in
+     * `config/manager-connector.php`, on this server, in the operator's own version control.
+     *
+     * That is stronger than accepting a host and checking it against an allow-list, because there is no
+     * comparison to get wrong — no value the platform sent is used even as an input to one. A
+     * compromised platform can vary the path within a bucket the operator already approved, and can do
+     * nothing else. A parameter named `url`, `host`, `endpoint`, `destination` or `bucket` on this
+     * signature would undo it, and a build check fails if one appears.
+     *
+     * Redirects are refused rather than followed. A 307 from a storage service is a perfectly ordinary
+     * thing that would, here, relocate a customer's database to wherever the response said.
+     *
+     * @param  array<string, string>  $headers  headers the presigned request committed to
+     * @return array{status: int}
+     */
+    public function putToGrant(
+        string $filePath,
+        string $grantPath,
+        string $grantQuery,
+        array $headers,
+        int $expiresAt,
+        int $maxBytes,
+    ): array {
+        $settings = Plugin::getInstance()->getSettings();
+
+        $configuredHost = trim($settings->backupUploadHost);
+
+        if ($configuredHost === '') {
+            throw new RuntimeException('this site has no backup upload host configured');
+        }
+
+        // Checked here rather than trusted from the settings model, because this is the one value
+        // standing between a grant and an arbitrary destination. Anything carrying a scheme, a slash,
+        // a colon or an @ is refused outright rather than escaped.
+        if (preg_match('/^([a-z0-9]([a-z0-9-]*[a-z0-9])?\.)+[a-z]{2,}$/i', $configuredHost) !== 1) {
+            throw new RuntimeException('the configured backup upload host is not a bare hostname');
+        }
+
+        if (!str_starts_with($grantPath, '/') || str_contains($grantPath, '..')) {
+            throw new RuntimeException('the platform issued an unusable upload path');
+        }
+
+        if ($expiresAt <= time()) {
+            // Checked before the socket opens. Uploading a gigabyte to a grant that has already lapsed
+            // wastes the site's bandwidth and ends in a rejection either way.
+            throw new RuntimeException('the upload grant expired before the backup was ready');
+        }
+
+        $bytes = filesize($filePath);
+
+        if ($bytes === false || $bytes <= 0) {
+            throw new RuntimeException('There is nothing to upload.');
+        }
+
+        if ($bytes > $maxBytes) {
+            throw new RuntimeException('the artifact is larger than the upload grant permits');
+        }
+
+        $handle = fopen($filePath, 'rb');
+
+        if ($handle === false) {
+            throw new RuntimeException('Could not open the artifact for upload.');
+        }
+
+        try {
+            $client = Craft::createGuzzleClient([
+                'timeout' => $settings->uploadTimeout,
+                'connect_timeout' => $settings->timeout,
+                'http_errors' => false,
+
+                // A storage service answering with a redirect must not be able to send a customer's
+                // database somewhere else.
+                'allow_redirects' => false,
+
+                // TLS verification, always, with no setting to turn it off. A "disable certificate
+                // checking" option exists to be switched on during a support call and left on.
+                'verify' => true,
+            ]);
+
+            $response = $client->put('https://' . $configuredHost . $grantPath . '?' . $grantQuery, [
+                'body' => $handle,
+                'headers' => array_merge($headers, [
+                    'Content-Length' => (string) $bytes,
+                    'Content-Type' => 'application/octet-stream',
+                ]),
+            ]);
+        } finally {
+            if (is_resource($handle)) {
+                fclose($handle);
+            }
+        }
+
+        $status = $response->getStatusCode();
+
+        if ($status < 200 || $status >= 300) {
+            // The storage service's body is not passed through. It can name a bucket, an account or a
+            // request id, and none of that belongs in a Craft log on a customer's server.
+            throw new RuntimeException("the artifact upload was refused with status {$status}");
+        }
+
+        return ['status' => $status];
+    }
+
     public function putFile(string $path, string $filePath, string $contentHash): array
     {
         $connection = Plugin::getInstance()->connection;
@@ -253,7 +360,7 @@ class Client extends Component
                 'http_errors' => false,
             ]);
 
-            $response = $client->put(rtrim(self::requireSecureUrl($record->platformUrl), '/').$path, [
+            $response = $client->put(rtrim(self::requireSecureUrl($record->platformUrl), '/') . $path, [
                 // Guzzle streams from the handle rather than buffering it.
                 'body' => $handle,
                 'headers' => [
@@ -261,7 +368,7 @@ class Client extends Component
                     Protocol::HEADER_TIMESTAMP => (string) $timestamp,
                     Protocol::HEADER_NONCE => $nonce,
                     Protocol::HEADER_CONNECTOR_VERSION => Plugin::VERSION,
-                    Protocol::HEADER_SIGNATURE => Protocol::SIGNATURE_SCHEME.'='.$signature,
+                    Protocol::HEADER_SIGNATURE => Protocol::SIGNATURE_SCHEME . '=' . $signature,
                     Protocol::HEADER_CONTENT_SHA256 => $contentHash,
 
                     // Declared so the platform can refuse an oversized upload before reading it. Sent
@@ -270,11 +377,11 @@ class Client extends Component
                     'Content-Length' => (string) $bytes,
                     'Content-Type' => 'application/octet-stream',
                     'Accept' => 'application/json',
-                    'User-Agent' => 'ManagerConnector/'.Plugin::VERSION.' (Craft)',
+                    'User-Agent' => 'ManagerConnector/' . Plugin::VERSION . ' (Craft)',
                 ],
             ]);
         } catch (GuzzleException $e) {
-            throw new RuntimeException('Could not upload to the Manager platform: '.$e->getMessage(), 0, $e);
+            throw new RuntimeException('Could not upload to the Manager platform: ' . $e->getMessage(), 0, $e);
         } finally {
             if (is_resource($handle)) {
                 fclose($handle);
@@ -320,7 +427,7 @@ class Client extends Component
         if ($scheme !== 'https') {
             throw new RuntimeException(
                 'The Manager platform URL must use HTTPS. A signed request over plain HTTP is still '
-                .'readable in transit, including the enrolment code used to pair.'
+                . 'readable in transit, including the enrolment code used to pair.'
             );
         }
 
@@ -341,16 +448,16 @@ class Client extends Component
         ]);
 
         try {
-            $response = $client->post(rtrim($platformUrl, '/').$path, [
+            $response = $client->post(rtrim($platformUrl, '/') . $path, [
                 'body' => $body,
                 'headers' => $headers + [
                     'Content-Type' => 'application/json',
                     'Accept' => 'application/json',
-                    'User-Agent' => 'ManagerConnector/'.Plugin::VERSION.' (Craft)',
+                    'User-Agent' => 'ManagerConnector/' . Plugin::VERSION . ' (Craft)',
                 ],
             ]);
         } catch (GuzzleException $e) {
-            throw new RuntimeException('Could not reach the Manager platform: '.$e->getMessage(), 0, $e);
+            throw new RuntimeException('Could not reach the Manager platform: ' . $e->getMessage(), 0, $e);
         }
 
         return [
@@ -381,7 +488,7 @@ class Client extends Component
             }
 
             $value = $values[0] ?? '';
-            $prefix = Protocol::SIGNATURE_SCHEME.'=';
+            $prefix = Protocol::SIGNATURE_SCHEME . '=';
 
             return str_starts_with($value, $prefix) ? substr($value, strlen($prefix)) : null;
         }

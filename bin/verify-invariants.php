@@ -23,6 +23,7 @@ declare(strict_types=1);
 
 $root = dirname(__DIR__);
 $sourceDir = $root.'/src';
+$templateDir = $sourceDir.'/templates';
 
 $failures = [];
 $checks = 0;
@@ -143,8 +144,12 @@ foreach ($sources as $file) {
 
     // Either an administrator or the utility's own permission. Not merely "some permission": the exact
     // string is asserted so this cannot quietly become a weaker one that every editor holds.
-    if (! str_contains($contents, '$this->requireAdmin(')
-        && ! str_contains($contents, "requirePermission('utility:'.ConnectorUtility::id())")) {
+    // Matched with tolerance for spacing and string-concatenation style, because a formatter must
+    // never be able to disable a security check. `craftcms/ecs` is an unpinned dev-main dependency and
+    // a change in its rules has already turned `! $x` into `!$x` across this repository once; a check
+    // that went quiet on that would be worse than no check, because it would still report success.
+    if (! preg_match('~\$this->requireAdmin\(~', $contents)
+        && ! preg_match("~requirePermission\(\s*'utility:'\s*\.\s*ConnectorUtility::id\(\)\s*\)~", $contents)) {
         $failures[] = "{$relative} does not require an administrator or the utility permission (invariant 4).";
     }
 
@@ -192,7 +197,7 @@ if (! str_contains($runner, 'function canHandle(')) {
     $failures[] = 'src/services/JobRunner.php no longer gates job types through canHandle() (invariant 9).';
 }
 
-if (! str_contains($runner, 'if (! $this->canHandle($type))')) {
+if (! preg_match('~if\s*\(\s*!\s*\$this->canHandle\(\$type\)\s*\)~', $runner)) {
     $failures[] = 'src/services/JobRunner.php no longer refuses unrecognised job types before running them (invariant 9).';
 }
 
@@ -299,6 +304,124 @@ if (! str_contains($backupRunner, 'the platform has no artifact encryption key c
 // check would pass with the finally block deleted entirely.
 if (preg_match('~finally\s*\{.{0,400}?shred\(\$dump.{0,300}?shred\(\$encrypted~s', $backupRunner) !== 1) {
     $failures[] = 'src/services/BackupRunner.php no longer removes both the dump and the artifact in a finally block; a failed backup must not leave a copy of the database on disk.';
+}
+
+// --------------------------------------------------------------------------------------------------
+// The platform does not choose who can read a backup.
+// --------------------------------------------------------------------------------------------------
+//
+// This is the counterpart to the destination check above, and the same argument.
+//
+// A backup is encrypted to keys the platform names, because the site has to be told which keys the
+// organisation holds and the platform is what tells it. That makes recipient selection an instruction
+// from an untrusted party, exactly like a destination would be. A Manager installation that had been
+// compromised, or compelled, could name a key of its own — and unlike a redirected upload there would
+// be no symptom at all. The backup would succeed. It would simply be readable by somebody else.
+//
+// So the same shape of defence: the answer comes from a file on this server rather than from the wire.
+// `config/manager-connector.php` lists the fingerprints this site accepts, the connector recomputes
+// each offered key's fingerprint from its key material, and anything unpinned fails the whole backup.
+//
+// These checks exist because every one of those properties is easy to weaken by accident while making
+// something else work, and none of them fails visibly when it is gone.
+$checks++;
+
+$recipientPinPath = $sourceDir.'/services/RecipientPin.php';
+
+if (!is_file($recipientPinPath)) {
+    $failures[] = 'src/services/RecipientPin.php is missing; nothing checks which keys the platform is allowed to name (invariant 8).';
+} else {
+    $recipientPin = sourceWithoutComments($recipientPinPath);
+
+    // The pinned list must come from local settings, not from anything that arrived over the wire.
+    //
+    // Matched on the receiver as well as the property name. Checking for the bare name would pass on
+    // any mention of it anywhere in the file — including the unrelated one in isConfigured() — so a
+    // version that read the list out of the platform's response would still have satisfied it. That
+    // is not a hypothetical: it is what the first draft of this check did.
+    if (!preg_match('~\$settings->recoveryKeyFingerprints~', $recipientPin)) {
+        $failures[] = 'src/services/RecipientPin.php no longer reads recoveryKeyFingerprints from local settings; the platform could then choose who can read this site\'s backups (invariant 8).';
+    }
+
+    // The fingerprint must be recomputed from the key material. Comparing the fingerprint the platform
+    // *sent* would let it label its own key with a customer's fingerprint and pass the check while
+    // sealing to the wrong key.
+    if (!str_contains($recipientPin, 'KeyFingerprint::forRecoveryKey(')) {
+        $failures[] = 'src/services/RecipientPin.php no longer derives fingerprints from key material; a platform could then label its own key with a fingerprint this site trusts (invariant 8).';
+    }
+
+    // An unpinned key must fail the backup rather than being filtered out of it. A `continue` here
+    // would produce a working backup and hide the fact that an unauthorised key was offered.
+    if (!preg_match('~isPinned\(.{0,400}?throw new RuntimeException~s', $recipientPin)) {
+        $failures[] = 'src/services/RecipientPin.php no longer refuses outright when an unpinned key is offered; filtering the offer would hide it (invariant 8).';
+    }
+}
+
+// The pin must be consulted before the database is dumped. A refusal that happens afterwards has
+// already written a complete copy of the database to disk, which is the file this whole feature is
+// arranged around not creating unnecessarily.
+//
+// Compared by position rather than matched as a pattern, and that is the second attempt. The obvious
+// regex — accept(...) followed by takeDump( — passes on a file where the order has been reversed,
+// because `takeDump(` also appears further down as the method's own declaration. A check that reports
+// success on the exact mutation it exists to catch is worse than no check.
+$acceptAt = strpos($backupRunner, 'recipientPin->accept(');
+$dumpAt = strpos($backupRunner, '$this->takeDump(');
+
+if ($acceptAt === false) {
+    $failures[] = 'src/services/BackupRunner.php no longer consults RecipientPin before backing up (invariant 8).';
+} elseif ($dumpAt !== false && $acceptAt > $dumpAt) {
+    $failures[] = 'src/services/BackupRunner.php checks the offered recovery keys after taking the dump; a refused backup must never leave a plaintext database on disk (invariant 8).';
+}
+
+// Nothing may seal an artifact key to a recipient that did not come back from accept().
+if (preg_match('~accept\(\$offeredRecipients\)~', $backupRunner) !== 1) {
+    $failures[] = 'src/services/BackupRunner.php seals to recipients that have not been through RecipientPin::accept() (invariant 8).';
+}
+
+// The format floor is a ratchet. A method that lowered it would undo the only downgrade control that
+// survives the platform being the adversary.
+$connectionSource = sourceWithoutComments($sourceDir.'/services/Connection.php');
+
+if (!str_contains($connectionSource, 'raiseBackupFormatFloor')) {
+    $failures[] = 'src/services/Connection.php no longer raises a backup format floor; a compromised platform could then ask this site to go back to backups it can read (invariant 8).';
+}
+
+foreach (['lowerBackupFormatFloor', 'resetBackupFormatFloor', 'clearBackupFormatFloor'] as $forbidden) {
+    if (str_contains($connectionSource, $forbidden)) {
+        $failures[] = "src/services/Connection.php defines {$forbidden}(); the format floor must only ever go up (invariant 8).";
+    }
+}
+
+// The upload host is built from local configuration and never from platform-supplied data.
+//
+// Checked as a shape, because the danger is a string concatenation that looks harmless. Only one
+// variable may follow a scheme literal, and its provenance is pinned separately below — matching on
+// the name alone would pass on any local called $configuredHost, including one assigned from a
+// response body.
+foreach (['services/Client.php', 'services/BackupRunner.php'] as $relative) {
+    $source = sourceWithoutComments($sourceDir.'/'.$relative);
+
+    if (preg_match('~[\'"]https?://[\'"]\s*\.\s*\$(?!configuredHost)~', $source) === 1) {
+        $failures[] = "src/{$relative} builds a URL from a variable other than the configured upload host; a destination must never come from the platform (invariant 8).";
+    }
+
+    if (str_contains($source, '$configuredHost')
+        && ! str_contains($source, '$configuredHost = trim($settings->backupUploadHost);')) {
+        $failures[] = "src/{$relative} uses \$configuredHost without assigning it from config/manager-connector.php (invariant 8).";
+    }
+}
+
+// And none of the three settings that carry these decisions may be editable from the control panel. A
+// hijacked control-panel session that could re-pin this site would defeat the only control that works.
+$settingsTemplate = is_file($templateDir.'/settings.twig')
+    ? (string) file_get_contents($templateDir.'/settings.twig')
+    : '';
+
+foreach (['recoveryKeyFingerprints', 'requirePinnedRecoveryKeys', 'backupUploadHost'] as $configOnly) {
+    if (str_contains($settingsTemplate, $configOnly)) {
+        $failures[] = "src/templates/settings.twig exposes {$configOnly}; it must be config-file only, or a hijacked control-panel session could change who can read this site's backups (invariant 8).";
+    }
 }
 
 // --------------------------------------------------------------------------------------------------

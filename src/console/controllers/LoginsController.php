@@ -11,26 +11,26 @@ declare(strict_types=1);
 
 namespace coyshdigital\managerconnector\console\controllers;
 
-use coyshdigital\managerconnector\services\Tasks;
 use craft\helpers\Console;
 use Throwable;
 use yii\console\ExitCode;
 
 /**
- * php craft manager-connector/jobs
+ * php craft manager-connector/logins
  *
- * Asks the platform whether there is anything to do, and does it. Intended for cron alongside the
- * heartbeat.
+ * Reports counts of failed control-panel sign-ins.
  *
- * Nothing is pushed to this site: the platform has no way to reach it. This is the site choosing to
- * ask, which is what lets it work from behind NAT with no inbound firewall rule.
+ * Counts, and nothing else — no username, no email address, no source address, no per-attempt
+ * record. The operator's question is "is this site being attacked, and is anybody locked out", and
+ * that is answered by four integers; a log of who tried to sign in as whom would be a record of real
+ * people's behaviour on somebody else's website.
  */
-class JobsController extends BaseController
+class LoginsController extends BaseController
 {
     public function actionIndex(): int
     {
         try {
-            $this->stdout($this->plugin()->tasks->run(Tasks::JOBS) . "\n", Console::FG_GREEN);
+            $this->stdout($this->plugin()->tasks->logins() . "\n", Console::FG_GREEN);
         } catch (Throwable $e) {
             $this->stderr(ucfirst($e->getMessage()) . "\n", Console::FG_RED);
 

@@ -30,13 +30,13 @@ class DisconnectController extends BaseController
     {
         $plugin = $this->plugin();
 
-        if (! $plugin->connection->isPaired()) {
+        if (!$plugin->connection->isPaired()) {
             $this->stdout("This site is not paired.\n");
 
             return ExitCode::OK;
         }
 
-        if ($this->interactive && ! $this->confirm("Delete this site's Manager identity? Reconnecting will need a new enrolment code.")) {
+        if ($this->interactive && !$this->confirm("Delete this site's Manager identity? Reconnecting will need a new enrolment code.")) {
             return ExitCode::OK;
         }
 

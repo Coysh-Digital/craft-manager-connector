@@ -11,8 +11,8 @@ declare(strict_types=1);
 
 namespace coyshdigital\managerconnector\services;
 
-use Craft;
 use coyshdigital\managerprotocol\SchemaValidator;
+use Craft;
 use craft\base\Component;
 use Throwable;
 
@@ -75,7 +75,7 @@ class UpdatesReporter extends Component
             return ['current' => $current, 'latest' => $current, 'update_available' => false];
         }
 
-        $latest = (string) $this->safely(static fn (): string => (string) $update->getLatest()?->version, $current);
+        $latest = (string) $this->safely(static fn(): string => (string) $update->getLatest()?->version, $current);
 
         return array_filter([
             'current' => $current,
@@ -84,10 +84,10 @@ class UpdatesReporter extends Component
             'releases_behind' => $this->releaseCount($update),
             'security_release_available' => $this->hasCriticalRelease($update),
             'latest_is_breaking' => $this->safely(
-                static fn (): bool => ($update->status ?? '') === 'breakpoint',
+                static fn(): bool => ($update->status ?? '') === 'breakpoint',
                 false,
             ),
-        ], static fn (mixed $value): bool => $value !== null);
+        ], static fn(mixed $value): bool => $value !== null);
     }
 
     /**
@@ -102,7 +102,7 @@ class UpdatesReporter extends Component
             $info = $installed[$handle] ?? null;
 
             $current = (string) ($info['version'] ?? 'unknown');
-            $latest = (string) $this->safely(static fn (): string => (string) $update->getLatest()?->version, $current);
+            $latest = (string) $this->safely(static fn(): string => (string) $update->getLatest()?->version, $current);
 
             $reported[] = array_filter([
                 'handle' => (string) $handle,
@@ -112,8 +112,8 @@ class UpdatesReporter extends Component
                 'update_available' => $this->hasUpdate($update),
                 'releases_behind' => $this->releaseCount($update),
                 'security_release_available' => $this->hasCriticalRelease($update),
-                'abandoned' => $this->safely(static fn (): bool => (bool) ($update->abandoned ?? false), false),
-            ], static fn (mixed $value): bool => $value !== null);
+                'abandoned' => $this->safely(static fn(): bool => (bool) ($update->abandoned ?? false), false),
+            ], static fn(mixed $value): bool => $value !== null);
         }
 
         return array_slice($reported, 0, 250);
@@ -138,9 +138,9 @@ class UpdatesReporter extends Component
             '8.5' => ['2029-12-31', false],
         ];
 
-        $branch = PHP_MAJOR_VERSION.'.'.PHP_MINOR_VERSION;
+        $branch = PHP_MAJOR_VERSION . '.' . PHP_MINOR_VERSION;
 
-        if (! isset($schedule[$branch])) {
+        if (!isset($schedule[$branch])) {
             return ['current' => PHP_VERSION];
         }
 
@@ -156,7 +156,7 @@ class UpdatesReporter extends Component
     private function hasUpdate(mixed $update): bool
     {
         return $this->safely(
-            static fn (): bool => ($update->status ?? 'up-to-date') !== 'up-to-date'
+            static fn(): bool => ($update->status ?? 'up-to-date') !== 'up-to-date'
                 && $update->getLatest() !== null,
             false,
         );
@@ -165,7 +165,7 @@ class UpdatesReporter extends Component
     private function releaseCount(mixed $update): ?int
     {
         return $this->safely(
-            static fn (): ?int => is_array($update->releases ?? null) ? count($update->releases) : null,
+            static fn(): ?int => is_array($update->releases ?? null) ? count($update->releases) : null,
             null,
         );
     }
@@ -178,7 +178,7 @@ class UpdatesReporter extends Component
      */
     private function hasCriticalRelease(mixed $update): bool
     {
-        return $this->safely(static function () use ($update): bool {
+        return $this->safely(static function() use ($update): bool {
             foreach ($update->releases ?? [] as $release) {
                 if ((bool) ($release->critical ?? false)) {
                     return true;
@@ -202,7 +202,7 @@ class UpdatesReporter extends Component
             return $reader();
         } catch (Throwable $e) {
             Craft::warning(
-                'Manager Connector could not read update information: '.$e->getMessage(),
+                'Manager Connector could not read update information: ' . $e->getMessage(),
                 'manager-connector',
             );
 

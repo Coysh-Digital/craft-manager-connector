@@ -11,10 +11,10 @@ declare(strict_types=1);
 
 namespace coyshdigital\managerconnector\controllers;
 
-use Craft;
 use coyshdigital\managerconnector\Plugin;
 use coyshdigital\managerconnector\records\ConnectionRecord;
 use coyshdigital\managerconnector\utilities\ConnectorUtility;
+use Craft;
 use craft\web\Controller;
 use Throwable;
 use yii\web\Response;
@@ -62,7 +62,7 @@ class EnrolController extends Controller
 
     public function beforeAction($action): bool
     {
-        if (! parent::beforeAction($action)) {
+        if (!parent::beforeAction($action)) {
             return false;
         }
 
@@ -73,7 +73,7 @@ class EnrolController extends Controller
         // and on managed hosting the person who looks after a site is often not a Craft administrator.
         // The permission carries real authority and the screen says so — the same arrangement as Craft's
         // own Database Backup utility, which lets its holder download the entire database.
-        $this->requirePermission('utility:'.ConnectorUtility::id());
+        $this->requirePermission('utility:' . ConnectorUtility::id());
 
         return true;
     }

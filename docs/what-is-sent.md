@@ -52,6 +52,40 @@ The *values* of configuration settings are never sent, and neither is any enviro
 
 Counts only. Job payloads are never read, because a queued job can carry site content.
 
+**Disk, PHP limits and response times** — requires `runtime:read`
+
+- Bytes and file count per asset volume, identified by its handle
+- Free and total space on the volume Craft's storage directory sits on
+- PHP's memory limit, execution time, upload and post size limits, and input-var limit
+- Whether opcache is on, and how much of it is used
+- How many PHP extensions are loaded — the count, not the list
+- Mean, median, 95th-percentile and slowest page render times
+
+Sizes, never names. A byte count says how much is there and nothing about what: no path, no file
+name, no directory listing. A volume that cannot be walked inside the time budget, or that lives on
+remote storage, is reported as **unmeasured** — deliberately distinguishable from empty, because a
+partial figure presented as a total is how somebody concludes a volume was emptied overnight.
+
+The render times come from a fixed ring of at most 200 samples taken from traffic the site was
+already serving. Each sample is a duration and nothing else: no URL, no visitor, no address, no user
+agent. And it is **server render time, not time to first byte** — DNS, TLS, queueing in front of PHP
+and the network to the visitor are all outside what this can see.
+
+**Failed sign-in counts** — requires `logins:read`
+
+- How many control-panel sign-ins failed in the last 24 hours
+- How many accounts that spans
+- How many accounts are locked out
+- How many of the affected accounts are administrators
+- When the most recent failure was
+
+Counts only, and never who. There is no field for a username, an email address, a user id or a source
+address, and nothing keeps a per-attempt record — these are read from Craft's own counters rather
+than by watching sign-ins happen.
+
+Note the figures are a floor rather than a total: Craft clears an account's counter when somebody
+signs in successfully, so an attempt that eventually worked leaves nothing behind in them.
+
 ## Refused, in full
 
 Not "filtered", not "redacted" — a report containing any of these is rejected outright:
@@ -68,6 +102,10 @@ Not "filtered", not "redacted" — a report containing any of these is rejected 
 - database credentials or connection strings
 - complete configuration files
 - arbitrary file contents
+- filesystem paths, file names or directory listings
+- `phpinfo()` output, ini paths, or the list of loaded extensions
+- the URL, visitor or address behind any request that was timed
+- the username, email address or source address behind any failed sign-in
 
 ## Why a boolean and not the value
 

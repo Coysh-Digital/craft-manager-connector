@@ -11,24 +11,28 @@ declare(strict_types=1);
 
 namespace coyshdigital\managerconnector;
 
-use Craft;
 use coyshdigital\managerconnector\models\Settings;
+use coyshdigital\managerconnector\services\BackupRunner;
 use coyshdigital\managerconnector\services\Client;
 use coyshdigital\managerconnector\services\Connection;
-use coyshdigital\managerconnector\services\BackupRunner;
 use coyshdigital\managerconnector\services\JobRunner;
+use coyshdigital\managerconnector\services\LoginsReporter;
+use coyshdigital\managerconnector\services\RecipientPin;
 use coyshdigital\managerconnector\services\Reporter;
+use coyshdigital\managerconnector\services\ResponseSampler;
 use coyshdigital\managerconnector\services\Scheduler;
+use coyshdigital\managerconnector\services\SystemReporter;
 use coyshdigital\managerconnector\services\Tasks;
 use coyshdigital\managerconnector\services\UpdatesReporter;
 use coyshdigital\managerconnector\utilities\ConnectorUtility;
+use Craft;
 use craft\base\Model;
 use craft\base\Plugin as BasePlugin;
 use craft\console\Application as ConsoleApplication;
-use craft\web\Application as CraftWebApplication;
-use craft\helpers\UrlHelper;
 use craft\events\RegisterComponentTypesEvent;
+use craft\helpers\UrlHelper;
 use craft\services\Utilities;
+use craft\web\Application as CraftWebApplication;
 use yii\base\Event;
 
 /**
@@ -56,8 +60,12 @@ use yii\base\Event;
  * @property-read UpdatesReporter $updates
  * @property-read JobRunner $jobs
  * @property-read BackupRunner $backups
+ * @property-read RecipientPin $recipientPin
  * @property-read Tasks $tasks
  * @property-read Scheduler $scheduler
+ * @property-read SystemReporter $system
+ * @property-read LoginsReporter $logins
+ * @property-read ResponseSampler $responseSampler
  *
  * @author Coysh Digital
  *
@@ -68,12 +76,12 @@ class Plugin extends BasePlugin
     /**
      * @var string The connector version reported to the platform and signed into every request.
      */
-    public const VERSION = '1.5.0';
+    public const VERSION = '1.7.0';
 
     /**
      * @inheritdoc
      */
-    public string $schemaVersion = '1.1.0';
+    public string $schemaVersion = '1.2.0';
 
     /**
      * @inheritdoc
@@ -100,12 +108,21 @@ class Plugin extends BasePlugin
         // happening anyway — it reads nothing from the request and there is no URL that reaches it.
         //
         // Registered only for web requests. On the console the commands are the schedule.
-        if (! Craft::$app instanceof ConsoleApplication) {
+        if (!Craft::$app instanceof ConsoleApplication) {
             Event::on(
                 CraftWebApplication::class,
                 CraftWebApplication::EVENT_AFTER_REQUEST,
-                static function (): void {
-                    Plugin::getInstance()?->scheduler->runDue();
+                static function(): void {
+                    $plugin = Plugin::getInstance();
+
+                    // Timing first, and separately, because the two have different failure modes and
+                    // neither should be able to take the other down. The sampler records a number
+                    // into a fixed-size cache ring — no URL, no visitor, no address — and swallows
+                    // everything, because a visitor's page must not fail because a measurement of it
+                    // did. See ResponseSampler for why this is render time and not TTFB.
+                    $plugin?->responseSampler->record();
+
+                    $plugin?->scheduler->runDue();
                 },
             );
         }
@@ -117,7 +134,7 @@ class Plugin extends BasePlugin
         Event::on(
             Utilities::class,
             Utilities::EVENT_REGISTER_UTILITIES,
-            static function (RegisterComponentTypesEvent $event): void {
+            static function(RegisterComponentTypesEvent $event): void {
                 $event->types[] = ConnectorUtility::class;
             },
         );

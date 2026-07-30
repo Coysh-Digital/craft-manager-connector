@@ -5,53 +5,94 @@ is what happens on the site's side of that.
 
 ## Before anything can happen
 
-Three things, all of which must be true:
+Four things, all of which must be true:
 
 1. The site has been granted `backups:create` in Manager. Never at pairing, and never with a switch —
    see [Capabilities](/capabilities).
-2. The Manager platform has an artifact encryption key configured. Without one this plugin refuses
-   outright rather than uploading a database unencrypted.
-3. Manager has queued a `backup.create` job, either on a schedule or because somebody pressed a button.
+2. Your organisation has at least one **active recovery key**. That is a keypair you generate on your
+   own machine; Manager holds the public half and has nowhere to put the other one.
+3. You have pinned that key's fingerprint in `config/manager-connector.php`. Strictly speaking a backup
+   will still run without this, but read [The step people skip](#the-step-people-skip) before deciding
+   not to.
+4. Manager has queued a `backup.create` job, either on a schedule or because somebody pressed a button.
 
 ## What the plugin does
 
-1. **Dumps the database using Craft's own backup.** `Craft::$app->getDb()->backup()`, which uses the
+1. **Checks which keys it is being asked to encrypt to, before anything else.** The keys arrive on a
+   signature-verified response. Every one is checked against the fingerprints pinned in your own
+   configuration, and a single unrecognised key fails the whole backup.
+2. **Dumps the database using Craft's own backup.** `Craft::$app->getDb()->backup()`, which uses the
    connection and credentials the site already has. There is no `mysqldump` command composed here, no
    shell, and nothing Manager could influence about how the dump is taken. Manager asked for a backup;
    it did not say how to produce one.
-2. **Generates a fresh encryption key**, for this artifact and no other.
-3. **Encrypts the dump** as a chunked authenticated stream, so nothing large is ever held in memory and
+3. **Generates a fresh encryption key**, for this artifact and no other.
+4. **Encrypts the dump** as a chunked authenticated stream, so nothing large is ever held in memory and
    a modified or truncated artifact is detected as such rather than read as a shorter backup.
-4. **Seals the key** to the platform's public encryption key. This plugin holds only the public half,
-   so it cannot reopen what it sealed — a site compromised in September cannot recover the keys to
-   artifacts it uploaded in June.
-5. **Declares the artifact**: sizes, checksums, and the sealed key. Metadata only.
-6. **Uploads the bytes** to the platform, streamed, with the content hash covered by the request
-   signature.
-7. **Deletes both temporary files**, whether the upload succeeded or not. While the plaintext dump
+5. **Seals that key once per recovery key.** This plugin holds only public halves, so it cannot reopen
+   what it sealed — a site compromised in September cannot recover the keys to artifacts it uploaded in
+   June.
+6. **Writes a manifest and signs it** with this site's own signing key, then wraps it around the
+   encrypted stream. The result is a self-describing file: everything needed to decrypt it is inside
+   it, so it can be opened years later with a private key and nothing else.
+7. **Declares the artifact**: sizes, checksums, the manifest and its signature. Metadata only.
+8. **Uploads the bytes**, streamed, with the content hash covered by the request signature.
+9. **Deletes every temporary file**, whether the upload succeeded or not. While the plaintext dump
    exists it is the most dangerous file on the server, so it exists for as short a time as possible.
 
-## The destination cannot be changed
-
-The `backup.create` job carries **no parameters at all**. In particular it carries nothing naming where
-the artifact should go.
-
-This is the single most important property of the feature. A parameter naming a destination would let a
-compromised platform tell every site it manages to send its database somewhere else. Instead the upload
-goes to the platform URL stored at pairing, and there is no argument, payload field or setting anywhere
-in the path that could replace it. A script in this repository fails the build if somebody adds one.
+Step 1 comes first for a reason that is easy to lose in a refactor: a refusal that happens after step 2
+has already written a complete copy of your database to disk.
 
 ## Encryption, stated plainly
 
-Artifacts are encrypted on this server before they leave it, which protects them in transit and at rest
-in the platform's storage. A stolen backup store yields nothing on its own.
+**Manager cannot read your backups.** The key that opens an artifact is sealed only to your
+organisation's recovery keys, and Manager has never held the other half of one — there is no column in
+its database for a recovery private key, no escrow copy, and no support process that could produce one.
+Somebody who stole Manager's database *and* its object storage would have ciphertext, wrapped keys they
+cannot open, and metadata.
 
-**It is not end-to-end encryption.** The platform holds the key that opens them — it has to, or nobody
-could ever restore one. Anyone with the platform's backup secret key and access to its storage can read
-every backup it holds.
+That is a much stronger claim than this page used to make, so here is exactly where it stops.
 
-What that means in practice: treat the Manager installation as being as sensitive as the sites it
-manages, because in effect it is.
+**It depends on you pinning fingerprints.** Manager tells this site which keys to encrypt to, because
+the site has no other way to learn them. A Manager installation that had been compromised — or that was
+compelled — could name a key of its own, and without pins this site would encrypt to it. Nothing would
+look wrong. See below.
+
+**It does not protect a compromised Craft site.** This server holds the database. Anybody with code
+execution here can read it directly, and does not need a backup to do so. What a compromised site
+*cannot* do is read backups it took before it was compromised, because it never held a key it could
+reopen.
+
+**It does not protect against losing your recovery key.** If you lose it, every backup encrypted to it
+is permanently unreadable. Manager cannot help. Nobody can. That is not a limitation of the
+implementation, it is what the guarantee costs.
+
+**Artifacts taken before recovery keys existed are not covered.** Those were sealed to Manager's own
+key and Manager can read them. Adding a recovery key does not change that retroactively, and Manager's
+own screen labels them.
+
+## The step people skip
+
+```php
+// config/manager-connector.php
+'recoveryKeyFingerprints' => [
+    'MGRK-4F3A-9C2B-7D18-E605-2A9F-33C1',
+],
+```
+
+Get the fingerprint from `manager-restore fingerprint recovery-key.pub` — the file on your machine, not
+the value on Manager's screen. Comparing Manager's screen against Manager's own claim proves nothing;
+it can display whatever it likes.
+
+This file is on your server, in your version control, and Manager cannot reach it. That is the entire
+idea, and it is why the setting is **not** editable from the control panel: a hijacked control-panel
+session that could re-pin this site would defeat the only control that actually works.
+
+Once your fleet is pinned, set `requirePinnedRecoveryKeys => true` so an unpinned site refuses outright
+rather than falling back.
+
+If a backup fails with *"the platform offered recovery key MGRK-…, which this site has not pinned"*,
+that is either a key you enrolled and forgot to pin, or a key you have never seen. Those need very
+different responses, which is why the message names it.
 
 ## Size limits
 
@@ -62,12 +103,25 @@ Two of them:
   early with a clear message beats failing late with a full volume.
 - The platform's own ceiling, which it applies before reading the upload.
 
+## The destination cannot be changed
+
+The `backup.create` job carries **no parameters at all**. In particular it carries nothing naming where
+the artifact should go.
+
+The upload goes to the platform URL stored at pairing. When direct-to-storage uploads are configured,
+Manager supplies a path and a query string and **never a host** — the URL is built from
+`backupUploadHost` in your own configuration, so no host Manager sent is used even as an input to a
+comparison. A script in this repository fails the build if that stops being true.
+
+The recipient list works the same way and for the same reason: Manager may name keys, but only ones you
+have already pinned.
+
 ## What Manager is never told
 
 The declaration is metadata. It contains no database credentials, no connection string, no table names,
-no row counts, no schema, and no sample of the contents. The platform needs enough to store the bytes,
-verify they arrived intact, and eventually decrypt them. Everything beyond that would be collection for
-its own sake.
+no row counts, no schema, and no sample of the contents. The progress report carries a job identifier,
+one word from a fixed list, and a timestamp — deliberately not a path, a byte count or the table
+currently being written, all of which describe your data under a heading that looks harmless.
 
 ## Restoring
 
@@ -78,6 +132,19 @@ for a compromised platform issuing a restore, a confirmation flow that makes the
 defined behaviour when a restore fails half way, and a tested recovery path from that state. None of
 that follows from being able to take a backup.
 
-To restore, retrieve the artifact from Manager — `php artisan manager:backups:fetch`, which decrypts it
-and verifies it against the checksum taken here — and load it with `mysql` or `psql` on a host you have
-chosen deliberately.
+To restore, download the artifact from Manager and open it yourself:
+
+```bash
+manager-restore inspect ./01JZX….artifact                      # what is it, whose keys open it
+manager-restore verify  --key=recovery-key.secret ./01JZX….artifact
+manager-restore decrypt --key=recovery-key.secret --out=./dump.sql ./01JZX….artifact
+```
+
+Then load `dump.sql` with `mysql` or `psql` on a host you have chosen deliberately.
+
+`manager-restore` never contacts Manager. If Manager has been gone for a year and all you have is the
+file and the key, it still works.
+
+**A backup you have not restored is a hypothesis.** Decrypting proves the file is intact and yours; it
+does not prove the SQL inside it loads into a working database. Nothing in this system can prove that
+except loading it into one. Do that on a scratch host, on a schedule, and write down when you last did.

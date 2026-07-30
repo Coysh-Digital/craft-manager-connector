@@ -62,7 +62,7 @@ class PairController extends BaseController
         try {
             $response = $plugin->client->pair($platformUrl, $enrolmentCode, $keypair);
         } catch (Throwable $e) {
-            $this->stderr('Pairing failed: '.$e->getMessage()."\n", Console::FG_RED);
+            $this->stderr('Pairing failed: ' . $e->getMessage() . "\n", Console::FG_RED);
 
             return ExitCode::UNAVAILABLE;
         }
@@ -84,10 +84,10 @@ class PairController extends BaseController
                 : null,
         );
 
-        if (! $isLive) {
+        if (!$isLive) {
             $this->stdout("Paired, but held for confirmation.\n", Console::FG_YELLOW);
             $this->stdout(sprintf(
-                "The platform expected '%s' and this site reported a different host, so nothing is\n".
+                "The platform expected '%s' and this site reported a different host, so nothing is\n" .
                 "reported until an administrator confirms the pairing in Manager.\n",
                 (string) ($response['expected_domain'] ?? 'a different domain'),
             ));
@@ -96,7 +96,7 @@ class PairController extends BaseController
         }
 
         $this->stdout("Paired successfully.\n", Console::FG_GREEN);
-        $this->stdout('  Granted: '.(implode(', ', $response['capabilities'] ?? []) ?: 'nothing yet')."\n");
+        $this->stdout('  Granted: ' . (implode(', ', $response['capabilities'] ?? []) ?: 'nothing yet') . "\n");
         $this->stdout("  Next: add 'php craft manager-connector/heartbeat' to cron.\n");
 
         return ExitCode::OK;

@@ -11,8 +11,8 @@ declare(strict_types=1);
 
 namespace coyshdigital\managerconnector\utilities;
 
-use Craft;
 use coyshdigital\managerconnector\Plugin;
+use Craft;
 use craft\base\Utility;
 
 /**

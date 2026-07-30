@@ -11,8 +11,8 @@ declare(strict_types=1);
 
 namespace coyshdigital\managerconnector\console\controllers;
 
-use craft\helpers\Console;
 use coyshdigital\managerconnector\Plugin;
+use craft\helpers\Console;
 use yii\console\ExitCode;
 
 /**
@@ -35,13 +35,13 @@ class StatusController extends BaseController
         }
 
         $this->stdout("Manager connection\n", Console::FG_GREEN);
-        $this->stdout('  State:             '.$connection->state."\n");
-        $this->stdout('  Platform:          '.$connection->platformUrl."\n");
-        $this->stdout('  Site identifier:   '.$connection->siteIdentifier."\n");
-        $this->stdout('  Capabilities:      '.(implode(', ', $plugin->connection->capabilities()) ?: 'none')."\n");
-        $this->stdout('  Last success:      '.($connection->lastSuccessAt ?? 'never')."\n");
-        $this->stdout('  Key rotated:       '.($connection->keyRotatedAt ?? 'never')."\n");
-        $this->stdout('  Connector version: '.Plugin::VERSION."\n");
+        $this->stdout('  State:             ' . $connection->state . "\n");
+        $this->stdout('  Platform:          ' . $connection->platformUrl . "\n");
+        $this->stdout('  Site identifier:   ' . $connection->siteIdentifier . "\n");
+        $this->stdout('  Capabilities:      ' . (implode(', ', $plugin->connection->capabilities()) ?: 'none') . "\n");
+        $this->stdout('  Last success:      ' . ($connection->lastSuccessAt ?? 'never') . "\n");
+        $this->stdout('  Key rotated:       ' . ($connection->keyRotatedAt ?? 'never') . "\n");
+        $this->stdout('  Connector version: ' . Plugin::VERSION . "\n");
 
         return ExitCode::OK;
     }

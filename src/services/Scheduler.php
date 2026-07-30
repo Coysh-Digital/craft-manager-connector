@@ -11,9 +11,9 @@ declare(strict_types=1);
 
 namespace coyshdigital\managerconnector\services;
 
-use Craft;
 use coyshdigital\managerconnector\jobs\RunTask;
 use coyshdigital\managerconnector\Plugin;
+use Craft;
 use craft\base\Component;
 use Throwable;
 
@@ -58,17 +58,17 @@ class Scheduler extends Component
     {
         $plugin = Plugin::getInstance();
 
-        if (! $plugin->getSettings()->webTrigger) {
+        if (!$plugin->getSettings()->webTrigger) {
             return null;
         }
 
         // Nothing to do until the site has an identity to report with.
-        if (! $plugin->connection->isActive()) {
+        if (!$plugin->connection->isActive()) {
             return null;
         }
 
         foreach (Tasks::schedule() as $task => $interval) {
-            if (! $this->claim($task, $interval)) {
+            if (!$this->claim($task, $interval)) {
                 continue;
             }
 
@@ -78,7 +78,7 @@ class Scheduler extends Component
                 // A queue that will not accept a job is a site problem, not a reporting problem. Logged
                 // and dropped: throwing here would turn it into a 500 on somebody's page.
                 Craft::warning(
-                    'Manager Connector could not queue '.$task.': '.$e->getMessage(),
+                    'Manager Connector could not queue ' . $task . ': ' . $e->getMessage(),
                     'manager-connector',
                 );
 
@@ -100,7 +100,7 @@ class Scheduler extends Component
     private function claim(string $task, int $interval): bool
     {
         try {
-            return Craft::$app->getCache()->add(self::CLAIM_PREFIX.$task, 1, $interval);
+            return Craft::$app->getCache()->add(self::CLAIM_PREFIX . $task, 1, $interval);
         } catch (Throwable) {
             // No usable cache means no way to throttle, and an unthrottled trigger would fire on every
             // request. Doing nothing is the safe failure.
@@ -119,7 +119,7 @@ class Scheduler extends Component
 
         foreach (array_keys(Tasks::schedule()) as $task) {
             try {
-                $due[$task] = Craft::$app->getCache()->get(self::CLAIM_PREFIX.$task) === false;
+                $due[$task] = Craft::$app->getCache()->get(self::CLAIM_PREFIX . $task) === false;
             } catch (Throwable) {
                 $due[$task] = false;
             }

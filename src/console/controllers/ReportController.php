@@ -27,9 +27,9 @@ class ReportController extends BaseController
     public function actionIndex(): int
     {
         try {
-            $this->stdout($this->plugin()->tasks->run(Tasks::REPORT)."\n", Console::FG_GREEN);
+            $this->stdout($this->plugin()->tasks->run(Tasks::REPORT) . "\n", Console::FG_GREEN);
         } catch (Throwable $e) {
-            $this->stderr(ucfirst($e->getMessage())."\n", Console::FG_RED);
+            $this->stderr(ucfirst($e->getMessage()) . "\n", Console::FG_RED);
 
             return ExitCode::UNAVAILABLE;
         }

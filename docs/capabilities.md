@@ -12,7 +12,49 @@ site gets one of them.
 | `licences:read` | No | Whether Craft and plugin licences are valid, on trial or expiring. Never the keys |
 | `security:read` | No | Safe configuration booleans: dev mode, HTTPS enforcement, admin changes, updates in production |
 | `system:read` | No | Queue depth, failed job count, pending migration count, environment classification |
+| `runtime:read` | No | Disk usage per asset volume, free space, PHP's numeric limits and opcache state, and how long the site takes to build its own pages |
+| `logins:read` | No | Counts of failed control-panel sign-ins, and how many accounts are locked out |
 | `backups:create` | **Never** | Taking a database backup, encrypting it and uploading it |
+
+### `runtime:read` and why it is separate from `system:read`
+
+The two look similar and are not. `system:read` reads numbers Craft already has in memory — the queue
+depth, the migration count. `runtime:read` **walks directory trees** to size the asset volumes, and
+**times requests** the site is serving.
+
+Both are a different kind of work from reading a version number, so they need a different decision.
+Folding them into `system:read` would have meant every site that granted that months ago quietly
+starting to do both, which is not something a permission should be able to do to you.
+
+What it sends: byte and file counts per volume, by handle; free and total disk space; PHP's memory,
+execution, upload and post limits; opcache state and memory; a count of loaded extensions; and mean,
+median, 95th-percentile and slowest render times.
+
+What it never sends: a path, a file name, a directory listing, `phpinfo()`, an ini path, the list of
+extensions, or any URL, visitor or address from the requests it timed. A volume it cannot walk — too
+large for the time budget, or on remote storage — is reported as *unmeasured*, never as empty.
+
+The timings are **server render time, not time to first byte**. The connector times its own site from
+inside the PHP process, so DNS, TLS, queueing in front of PHP and the network to the visitor are all
+excluded. A site with a slow TTFB and a fast render looks fast in this figure and is not.
+
+Turn the timing off with `sampleResponseTimes` in the plugin config; adjust the directory-walk budget
+with `storageWalkSeconds`.
+
+### `logins:read`
+
+Four counts and one timestamp: attempts, accounts affected, accounts locked out, and how many of the
+affected accounts are administrators.
+
+**Never a username, an email address, a user id or the address anybody connected from.** These are
+read from Craft's own `invalidLoginCount`, `lastInvalidLoginDate` and `lockoutDate` columns rather
+than by listening for login failures and keeping a log — a record of who tried to sign in as whom,
+from where, is a log of real people's behaviour on your website, and there is no reason for a
+monitoring platform to hold one.
+
+One caveat travels with the numbers: Craft resets an account's counter when somebody signs in
+successfully, so the totals are a **floor, not a total**. An attempt that eventually worked leaves
+nothing behind in them.
 
 ## Read-only by default
 

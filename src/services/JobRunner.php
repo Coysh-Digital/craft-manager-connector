@@ -11,9 +11,10 @@ declare(strict_types=1);
 
 namespace coyshdigital\managerconnector\services;
 
-use Craft;
 use coyshdigital\managerconnector\Plugin;
 use coyshdigital\managerprotocol\Jobs;
+use coyshdigital\managerprotocol\Protocol;
+use Craft;
 use craft\base\Component;
 use Throwable;
 
@@ -64,6 +65,27 @@ class JobRunner extends Component
             $plugin->connection->updateBackupPublicKey(is_string($key) && $key !== '' ? $key : null);
         }
 
+        /*
+         | Which format to produce, and which recovery keys to seal to.
+         |
+         | Held in a local rather than stored. The backup job is handled later in this same request, so
+         | there is nothing to persist, and a recipient list written to disk is one that can go stale —
+         | a key revoked this morning must not be sealed to this evening because a row still named it.
+         |
+         | Adopting this from a signature-verified response proves only that the platform said it. It
+         | does not make it true, and a compromised platform could name a key of its own. What stops
+         | that is {@see RecipientPin}, which refuses anything not pinned in a file on this server.
+         */
+        $backup = is_array($response['backup'] ?? null) ? $response['backup'] : [];
+
+        $format = is_string($backup['format'] ?? null)
+            ? $backup['format']
+            : Protocol::BACKUP_FORMAT_V1;
+
+        $recipients = is_array($backup['recipients'] ?? null)
+            ? array_values(array_filter($backup['recipients'], 'is_array'))
+            : [];
+
         /** @var list<array<string, mixed>> $jobs */
         $jobs = $response['jobs'] ?? [];
 
@@ -79,7 +101,7 @@ class JobRunner extends Component
 
             // The connector's own allowlist. A type this build does not implement is refused rather
             // than attempted, whatever the platform said.
-            if (! $this->canHandle($type)) {
+            if (!$this->canHandle($type)) {
                 $tally['refused']++;
 
                 $this->report($id, false, [], "this connector does not implement '{$type}'");
@@ -93,7 +115,7 @@ class JobRunner extends Component
             }
 
             try {
-                $result = $this->handle($type, $id, $job['parameters'] ?? []);
+                $result = $this->handle($type, $id, $job['parameters'] ?? [], $recipients, $format);
 
                 $this->report($id, true, $result);
                 $tally['succeeded']++;
@@ -105,7 +127,7 @@ class JobRunner extends Component
                 $this->report($id, false, [], $this->safeFailureMessage($e));
 
                 Craft::error(
-                    'Manager Connector job failed: '.$e->getMessage(),
+                    'Manager Connector job failed: ' . $e->getMessage(),
                     'manager-connector',
                 );
             }
@@ -133,17 +155,19 @@ class JobRunner extends Component
      * here for a crafted job type to reach.
      *
      * @param  array<string, mixed>  $parameters
+     * @param  list<array<string, mixed>>  $recipients
      * @return array<string, mixed>
      */
-    private function handle(string $type, string $jobId, array $parameters): array
+    private function handle(string $type, string $jobId, array $parameters, array $recipients = [], string $format = Protocol::BACKUP_FORMAT_V1): array
     {
         return match ($type) {
             Jobs::INVENTORY_REFRESH => $this->refreshInventory(),
             Jobs::UPDATES_CHECK => $this->checkUpdates($parameters),
 
-            // The job identifier is passed, not a destination. Everything the backup needs to know
-            // about where it is going comes from the connection record.
-            Jobs::BACKUP_CREATE => Plugin::getInstance()->backups->run($jobId),
+            // The job identifier and the recipient list, never a destination. Where the artifact goes
+            // still comes from the connection record and nowhere else; who can open it is checked
+            // against this site's own pinned fingerprints before anything is dumped.
+            Jobs::BACKUP_CREATE => Plugin::getInstance()->backups->run($jobId, $recipients, $format),
             // Unreachable: canHandle() gates this. Present so adding a constant without a handler
             // fails loudly rather than silently doing nothing.
             default => throw new \LogicException("No handler for '{$type}'."),
@@ -216,13 +240,13 @@ class JobRunner extends Component
                 'succeeded' => $succeeded,
                 'result' => $result === [] ? null : $result,
                 'failure_reason' => $failureReason,
-            ], static fn (mixed $value): bool => $value !== null));
+            ], static fn(mixed $value): bool => $value !== null));
         } catch (Throwable $e) {
             // Reporting failed, not the job. Left unreported, the platform expires it after the
             // definition's maximum runtime — which is the right outcome, and better than retrying
             // here and risking running the work twice.
             Craft::error(
-                'Manager Connector could not report a job result: '.$e->getMessage(),
+                'Manager Connector could not report a job result: ' . $e->getMessage(),
                 'manager-connector',
             );
         }
@@ -239,6 +263,6 @@ class JobRunner extends Component
     {
         $shortName = (new \ReflectionClass($e))->getShortName();
 
-        return mb_substr($shortName.': '.$e->getMessage(), 0, 200);
+        return mb_substr($shortName . ': ' . $e->getMessage(), 0, 200);
     }
 }

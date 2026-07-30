@@ -1,5 +1,127 @@
 # Changelog
 
+## 1.7.0
+
+Backups this platform cannot read.
+
+Requires protocol 1.2.0, and a Manager installation new enough to serve recovery keys. A 1.7.0
+connector talking to an older platform keeps producing v1 artifacts exactly as before.
+
+### The change
+
+Under the old arrangement an artifact's encryption key was sealed to *Manager's* public key, and
+Manager opened it on arrival. That was stated honestly — the documentation said in as many words that
+it was not end-to-end encryption — but it meant anybody holding Manager's backup secret key and its
+storage could read every backup it held.
+
+Now the key is sealed to the organisation's own recovery keys and to nothing else. Manager stores,
+verifies, serves and deletes something it cannot open.
+
+### Pinning, which is the part that matters
+
+Sealing to a customer's key is worth nothing if Manager can choose which key that is. It has to name
+them — this site has no other way to learn them — so a compromised or compelled installation could name
+one of its own, and this site would encrypt to it. No error, no missing backup. Just a backup somebody
+else can read.
+
+So `config/manager-connector.php` gains `recoveryKeyFingerprints`. Every key Manager offers is
+fingerprinted **from its key material**, not from the label Manager attached to it, and compared against
+that list. An unpinned key fails the whole backup rather than being filtered out of it, because a
+response containing one is evidence of a misconfiguration or an attack and quietly dropping it would
+hide both. The check runs before `takeDump()`, so a refused backup never writes a plaintext database to
+disk.
+
+The setting is config-file only and there is a build check asserting it never appears in the settings
+template. A hijacked control-panel session that could re-pin this site would defeat the only control
+that works.
+
+Also new: `requirePinnedRecoveryKeys` (off by default — see the docs for why that compromise), and
+`backupUploadHost` for direct-to-storage uploads, where Manager supplies a path and a query string and
+never a host.
+
+### The ratchet
+
+`{{%managerconnector_connection}}` gains `backupFormatFloor`. It goes to `v2` the first time this site
+finds pinned fingerprints or completes a v2 backup, and no response from Manager can lower it —
+`updateBackupPublicKey()` becomes a logging no-op and there is no v1 code path left to reach. Lowering
+it means editing this server.
+
+This is the only downgrade control that survives Manager being the adversary. Every other defence is
+something Manager participates in, and therefore something a compromised Manager can decline to perform.
+
+### Build checks
+
+`bin/verify-invariants.php` gains a ninth check covering all of the above: that the pin is read from
+local settings rather than from the wire, that fingerprints are derived from key material, that an
+unpinned key throws rather than continues, that the check precedes the dump, that the ratchet has no
+inverse, and that none of the three settings is exposed in the control panel.
+
+Two existing checks were made tolerant of whitespace and concatenation style while doing this. They
+matched exact source strings, and a change in `craftcms/ecs` — an unpinned `dev-main` dependency —
+turned `! $x` into `!$x` across the repository and silently disabled both. A security check that a
+formatter can switch off while still reporting success is worse than no check.
+
+### One progress report
+
+`POST /api/connector/v1/backups/progress`, sent once, when the dump starts. It is the longest phase and
+the only one whose information is not derivable from a later report; everything else would be a signed
+request consuming a nonce and a rate-limit slot to record something already implied, and a report that
+can be lost is a state that can lie. It carries a job identifier, one word from a fixed list, and a
+timestamp — no path, no byte count, no table name.
+
+### Fixed
+
+- `ResponseSampler` called `Plugin::instanceOrNull()`, which exists on no class in the hierarchy and
+  was additionally resolving against the `services` namespace rather than the plugin's. The resulting
+  `Error` was swallowed by the surrounding catch, so **no response time was ever recorded** and the
+  runtime report's `response` section was silently always absent — indistinguishable from a site that
+  had turned the setting off.
+
+## 1.6.0
+
+Requires `coysh-digital/manager-protocol` 1.1.0.
+
+Three new things a site can report, each behind a capability of its own that has to be granted
+deliberately. None of them is folded into an existing grant: measuring disk means walking a directory
+tree and timing responses means observing traffic, and widening `system:read` to cover them would
+have had sites start doing both without anybody deciding to.
+
+- **Disk usage** (`runtime:read`, `system.v1`). Byte and file counts per asset volume, by handle, plus
+  free and total space. Never a path, a file name or a listing — a byte count says how much is there
+  and nothing about what. The walk is bounded by `storageWalkSeconds` (five by default); a volume that
+  runs out of budget, or that lives on remote storage, is reported as **unmeasured** rather than as
+  empty. Those are different facts and only one of them should worry anybody: a partial figure
+  presented as a total is how somebody concludes an asset volume was emptied overnight.
+- **PHP limits** (`runtime:read`, `system.v1`). Memory, execution time, upload and post size, input
+  vars, opcache state and memory, and a count of loaded extensions. Never `phpinfo()`, never an ini
+  path, never the list of extensions, and never a setting whose value would name the host.
+- **Response times** (`runtime:read`, `system.v1`). Mean, median, 95th percentile and slowest, from a
+  fixed ring of up to 200 samples taken from traffic the site was already serving. It stores a
+  duration and nothing else — no URL, no visitor, no address. **This is server render time, not time
+  to first byte:** it excludes DNS, TLS, queueing in front of PHP and the network to the visitor, so a
+  site with a two-second TTFB and a 40ms render looks fast in it and is not. Controlled by
+  `sampleResponseTimes`, on by default; the sampler swallows every error, because a visitor's page
+  must not fail because a measurement of it did.
+- **Failed sign-ins** (`logins:read`, `logins.v1`). Four counts and a timestamp: attempts, accounts
+  affected, accounts locked out, and how many of those are administrators. Read from Craft's own
+  `invalidLoginCount`, `lastInvalidLoginDate` and `lockoutDate` rather than by listening for login
+  failures and keeping a log — a record of who tried to sign in as whom, from where, is a log of real
+  people's behaviour on somebody else's website, and there is no stated purpose for collecting it.
+  **Never a username, an email address, a user id or a source address.** Note the figures are a floor
+  rather than a total: Craft resets an account's counter on a successful sign-in, so somebody who
+  eventually guessed correctly leaves nothing behind in them.
+
+Also:
+
+- `manager-connector/preview` now covers **every** report the connector can produce, not just
+  inventory, and shows each one whether or not its capability is granted — the question it answers is
+  "what would this reveal if I turned it on", which has to be answerable before turning it on. Use
+  `--report=logins` for one at a time.
+- New commands `manager-connector/system` and `manager-connector/logins`. On the schedule, sign-in
+  counters run half-hourly and the runtime report six-hourly: disk usage moves over days, and a
+  directory walk every hour on a million-file volume is a cost the site pays for a number nobody reads
+  that often.
+
 ## 1.5.0
 
 - **Cron is no longer required.** `webTrigger`, on by default, drives the schedule from ordinary web

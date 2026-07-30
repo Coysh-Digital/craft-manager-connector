@@ -27,4 +27,53 @@ return [
 
     // Seconds to wait for the platform. A slow platform must never become a slow website.
     'timeout' => 10,
+
+    /*
+    |----------------------------------------------------------------------------------------------
+    | Recovery keys
+    |----------------------------------------------------------------------------------------------
+    |
+    | The fingerprints of the keys this site will encrypt backups to, and no others.
+    |
+    | This is the most important setting here, and the easiest to skip. Backups are encrypted to keys
+    | Manager names, because this site has to be told which keys your organisation holds and Manager
+    | is what tells it. That means a Manager installation that had been compromised — or that was
+    | compelled — could name a key of its own, and this site would encrypt to it. No error, no missing
+    | backup. Just a backup somebody else can read.
+    |
+    | Listing the fingerprints here closes that. They live on your server, in your version control,
+    | and Manager cannot reach them. Any key it offers that is not on this list fails the whole backup
+    | rather than being quietly skipped, and the check runs before the database is dumped.
+    |
+    | Get them from `manager-restore fingerprint recovery-key.pub`, or from the Manager settings
+    | screen — but note that comparing Manager's screen against Manager's own claim proves nothing.
+    | The file on your laptop is the reference.
+    */
+    // 'recoveryKeyFingerprints' => [
+    //     'MGRK-4F3A-9C2B-7D18-E605-2A9F-33C1',
+    // ],
+
+    /*
+    | Refuse to back up at all when no fingerprints are listed above.
+    |
+    | Off by default, and that is a compromise rather than a recommendation. On, this is strictly
+    | safer. Off, a site that has been paired but not yet pinned still backs up, and Manager's own
+    | screen nags about it — which beats turning "we have not finished the setup" into "we have no
+    | backups", silently, on the day somebody needs one.
+    |
+    | Turn it on once your fleet is pinned.
+    */
+    // 'requirePinnedRecoveryKeys' => false,
+
+    /*
+    | Host to upload backup artifacts to when Manager issues a direct upload grant.
+    |
+    | Empty disables direct uploads entirely and sends artifacts through Manager, as before.
+    |
+    | Manager supplies a path and a query string; it never supplies a host, and there is no code path
+    | by which it could. The URL is built as `https://` plus this value plus what it sent, which is
+    | stronger than checking a host it supplied — no host from Manager is used even as an input to a
+    | comparison.
+    */
+    // 'backupUploadHost' => '',
 ];

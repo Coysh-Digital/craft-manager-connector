@@ -29,6 +29,24 @@ anything in between is flagged as a security release. Requires `updates:read`.
 **Run daily.** It makes an outbound request to Craft's own update service, so there is no value in
 hammering it.
 
+### `manager-connector/system`
+
+Reports disk usage per asset volume, free space, PHP's numeric limits and opcache state, and how long
+the site has been taking to build its own pages. Requires `runtime:read`.
+
+**Run every 6 hours.** This is the one genuinely expensive command: it walks the asset volumes, and a
+volume with a million files on network storage takes real time. Disk usage moves over days, so hourly
+would be paying a cost every hour for a number nobody reads that often. The walk is bounded by
+`storageWalkSeconds`; a volume that runs out of budget is reported as unmeasured rather than as empty.
+
+### `manager-connector/logins`
+
+Reports counts of failed control-panel sign-ins — attempts, accounts affected, accounts locked out,
+and how many of those are administrators. Never usernames or addresses. Requires `logins:read`.
+
+**Run every 30 minutes.** It is one indexed query, and frequent enough that an attack in progress is
+visible while it is still in progress.
+
 ### `manager-connector/jobs`
 
 Claims and runs whatever work Manager has queued for this site — an immediate inventory refresh, an
@@ -67,20 +85,33 @@ The first thing to run when something is not reporting.
 
 ### `manager-connector/preview`
 
-Prints the exact payload this site would send, without sending it.
+Prints the exact payloads this site would send, without sending them.
 
 Worth running before you pair, if you want to see what you are agreeing to rather than read a page about
-it. It uses the same builder the real report uses, so there is no version of it that could differ from
+it. It uses the same builders the real reports use, so there is no version of it that could differ from
 what actually goes out.
+
+Covers **every** report — inventory, updates, system and logins — and shows each one whether or not its
+capability has been granted, marking which is which. That is deliberate: the question this answers is
+"what would this reveal if I turned it on", which has to be answerable before turning it on.
+
+Add `--report=logins` for one at a time. Valid values are `report`, `updates`, `system` and `logins`.
 
 ## Scheduling all of it
 
 ```cron
 */5 * * * * cd /path/to/site && php craft manager-connector/heartbeat
 */5 * * * * cd /path/to/site && php craft manager-connector/jobs
+*/30 * * * * cd /path/to/site && php craft manager-connector/logins
 0 * * * *   cd /path/to/site && php craft manager-connector/report
+0 */6 * * * cd /path/to/site && php craft manager-connector/system
 0 6 * * *   cd /path/to/site && php craft manager-connector/updates
 ```
+
+Schedule all six even if the site has not been granted every capability. A command whose capability is
+missing exits immediately saying so and costs nothing — whereas a cron entry nobody adds when the
+capability is granted six months later produces a screen that reads "granted, but nothing reported
+yet" indefinitely, with no obvious reason why.
 
 ### If you cannot use cron
 
@@ -119,4 +150,6 @@ rather the schedule came from one place.
 | `timeout` | `10` | Seconds to wait for the platform. Short on purpose — a slow platform must never become a slow website |
 | `uploadTimeout` | `900` | Seconds to wait while uploading a backup, which is measured in megabytes rather than milliseconds |
 | `maxBackupMegabytes` | `2048` | Largest database this connector will attempt to back up. A safety valve, not a policy |
+| `sampleResponseTimes` | `true` | Time the site's own responses for the runtime report. One cache write per request into a fixed ring of 200 durations — a number and nothing else, no URL, visitor or address. Nothing is transmitted without `runtime:read` |
+| `storageWalkSeconds` | `5` | Seconds to spend measuring asset volumes before giving up on the rest. A volume that runs out of budget is reported as unmeasured rather than as empty |
 | `useQueue` | `false` | Also send the heartbeat through Craft's queue |

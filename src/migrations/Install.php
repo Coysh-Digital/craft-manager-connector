@@ -11,8 +11,8 @@ declare(strict_types=1);
 
 namespace coyshdigital\managerconnector\migrations;
 
-use craft\db\Migration;
 use coyshdigital\managerconnector\records\ConnectionRecord;
+use craft\db\Migration;
 
 /**
  * Creates the single table this plugin owns.
