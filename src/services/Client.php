@@ -97,9 +97,10 @@ class Client extends Component
      * Send a signed request as this site.
      *
      * @param  array<string, mixed>  $payload
+     * @param  bool  $expectSigned  require and verify a platform signature on the response
      * @return array<string, mixed>
      */
-    public function post(string $path, array $payload): array
+    public function post(string $path, array $payload, bool $expectSigned = false): array
     {
         $connection = Plugin::getInstance()->connection;
         $record = $connection->current();
@@ -147,6 +148,31 @@ class Client extends Component
                 $response['status'],
                 $decoded['correlation_id'] ?? 'unknown',
             ));
+        }
+
+        // Responses carrying instructions or security-sensitive configuration are signed by the
+        // platform, and this is where that signature earns its keep. Without checking it, anything
+        // sitting between this site and the platform could hand us a job to run or a capability set
+        // to adopt.
+        //
+        // Fails closed: a missing signature on an endpoint that should have one is treated exactly
+        // like an invalid one.
+        if ($expectSigned) {
+            $signature = $this->signatureFrom($response['headers']);
+
+            $canonical = new CanonicalResponse(
+                siteId: $record->siteIdentifier,
+                requestNonce: $nonce,
+                status: $response['status'],
+                body: $response['body'],
+            );
+
+            if ($signature === null || ! $canonical->verify($signature, $record->platformPublicKey)) {
+                throw new RuntimeException(
+                    'The platform response failed signature verification and was discarded. '
+                    .'Someone may be intercepting this connection.'
+                );
+            }
         }
 
         $connection->recordSuccess();

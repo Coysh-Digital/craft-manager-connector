@@ -44,7 +44,16 @@ class JobRunner extends Component
     {
         $plugin = Plugin::getInstance();
 
-        $response = $plugin->client->post('/api/connector/v1/jobs/claim', []);
+        // expectSigned: this response carries instructions, so an unverified one is discarded.
+        $response = $plugin->client->post('/api/connector/v1/jobs/claim', [], expectSigned: true);
+
+        // The platform's current view of what this site may do. Adopted from a verified response, so
+        // the connector stays in step when a capability is granted or revoked — without it, the
+        // capability list would stay frozen at whatever pairing agreed, and granting one on the
+        // platform would silently change nothing.
+        if (isset($response['capabilities']) && is_array($response['capabilities'])) {
+            $plugin->connection->updateCapabilities(array_values($response['capabilities']));
+        }
 
         /** @var list<array<string, mixed>> $jobs */
         $jobs = $response['jobs'] ?? [];

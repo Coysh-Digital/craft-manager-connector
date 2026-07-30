@@ -13,6 +13,7 @@ namespace coyshdigital\managerconnector\services;
 
 use Craft;
 use coyshdigital\managerconnector\Plugin;
+use coyshdigital\managerprotocol\InventorySections;
 use coyshdigital\managerprotocol\SchemaValidator;
 use craft\base\Component;
 use Throwable;
@@ -35,9 +36,26 @@ use Throwable;
 class Reporter extends Component
 {
     /**
+     * Build a report covering only what this site has been granted.
+     *
+     * Gathering everything and then filtering would mean reading licence state, or the queue, for a
+     * site that never asked us to — so each section is only *collected* if the capability is held.
+     * The filter afterwards is belt and braces.
+     *
      * @return array<string, mixed>
      */
     public function build(): array
+    {
+        $granted = Plugin::getInstance()->connection->capabilities();
+
+        return InventorySections::filter($this->gather($granted), $granted);
+    }
+
+    /**
+     * @param  list<string>  $granted
+     * @return array<string, mixed>
+     */
+    private function gather(array $granted): array
     {
         $payload = [
             'schema_version' => 'inventory.v1',
@@ -57,6 +75,14 @@ class Reporter extends Component
             'migrations' => fn (): array => $this->migrations(),
             'licence' => fn (): array => $this->licence(),
         ] as $key => $reader) {
+            $capability = InventorySections::capabilityFor($key);
+
+            // Not collected at all without the capability. Reading licence state for a site that
+            // never granted licences:read, only to discard it, would still be reading it.
+            if ($capability !== null && ! in_array($capability, $granted, true)) {
+                continue;
+            }
+
             $value = $this->safely($reader, []);
 
             if ($value !== []) {

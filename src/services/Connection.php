@@ -145,6 +145,45 @@ class Connection extends Component
         return in_array($capability, $this->capabilities(), true);
     }
 
+    /**
+     * Adopt the capability set the platform reports.
+     *
+     * Only ever called with a set that arrived on a **signature-verified** response. A capability
+     * list is security-sensitive configuration: adopting one from an unverified source would let
+     * whatever sits between this site and the platform decide what the site is willing to report.
+     *
+     * @param  list<string>  $capabilities
+     * @return bool whether anything changed
+     */
+    public function updateCapabilities(array $capabilities): bool
+    {
+        $record = $this->current();
+
+        if ($record === null) {
+            return false;
+        }
+
+        sort($capabilities);
+        $current = $this->capabilities();
+        sort($current);
+
+        if ($current === $capabilities) {
+            return false;
+        }
+
+        $record->capabilities = json_encode($capabilities, JSON_THROW_ON_ERROR);
+        $record->save(false);
+
+        $this->cached = $record;
+
+        Craft::info(
+            'Manager Connector capabilities updated to: '.(implode(', ', $capabilities) ?: 'none'),
+            'manager-connector',
+        );
+
+        return true;
+    }
+
     public function recordSuccess(): void
     {
         $record = $this->current();
