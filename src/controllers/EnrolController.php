@@ -14,6 +14,7 @@ namespace coyshdigital\managerconnector\controllers;
 use Craft;
 use coyshdigital\managerconnector\Plugin;
 use coyshdigital\managerconnector\records\ConnectionRecord;
+use coyshdigital\managerconnector\utilities\ConnectorUtility;
 use craft\web\Controller;
 use Throwable;
 use yii\web\Response;
@@ -65,32 +66,16 @@ class EnrolController extends Controller
             return false;
         }
 
-        // Administrators only. Pairing decides which platform may read this site's operational state,
-        // which is not a content permission and does not belong on one.
-        $this->requireAdmin(false);
+        // The utility's own permission. Craft already enforces it to view the screen; enforced again
+        // here because the action is reachable without visiting the screen first.
+        //
+        // Not requireAdmin(). An owner who grants this permission means the holder to be able to use it,
+        // and on managed hosting the person who looks after a site is often not a Craft administrator.
+        // The permission carries real authority and the screen says so — the same arrangement as Craft's
+        // own Database Backup utility, which lets its holder download the entire database.
+        $this->requirePermission('utility:'.ConnectorUtility::id());
 
         return true;
-    }
-
-    /**
-     * The connector's own screen.
-     *
-     * A page of its own rather than a panel inside plugin settings, because Craft wraps
-     * settingsHtml() in its own form and a form cannot be nested inside another. The first attempt at
-     * this did nest one, and the result was a pairing button that silently submitted Craft's
-     * save-plugin-settings action instead.
-     */
-    public function actionIndex(): Response
-    {
-        $plugin = Plugin::getInstance();
-
-        return $this->renderTemplate('manager-connector/settings', [
-            'plugin' => $plugin,
-            'settings' => $plugin->getSettings(),
-            'connection' => $plugin->connection->current(),
-            'connectorVersion' => Plugin::VERSION,
-            'securityUrl' => 'https://coysh.digital/manager/docs/security/',
-        ]);
     }
 
     /**

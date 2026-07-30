@@ -1,5 +1,18 @@
 # Changelog
 
+## 1.4.0
+
+- The connector's screen moved from plugin settings to **Utilities**. Not for reachability — a plugin
+  settings page stays linked and reachable with `allowAdminChanges` off, which was checked rather than
+  assumed. It moved because of what the screen is: Settings holds things that are set, Utilities holds
+  things you do, alongside Craft's own Updates, Caches and Database Backup.
+- Pairing now needs the `utility:manager-connector` permission rather than Craft administrator, so an
+  owner can let the person who looks after a site connect it without making them an administrator.
+  That permission carries real authority and the screen says so.
+- This plugin now registers no URL rules at all. Craft routes the utility, and the two actions go
+  through Craft's action mechanism — POST with a CSRF token — so nothing it registers can be reached
+  by following a link.
+
 ## 1.3.0
 
 - Pair and disconnect from the control panel. The console still works, but requiring SSH excluded

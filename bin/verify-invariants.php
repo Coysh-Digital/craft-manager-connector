@@ -105,11 +105,10 @@ foreach ($sources as $file) {
 }
 
 // The control-panel routes this plugin may register. Adding one is an edit here as well as there.
-$permittedCpRoutes = [
-    // The connector's own screen. The two state-changing actions are reached through Craft's action
-    // mechanism, which requires POST and a CSRF token, so they deliberately have no URL rule.
-    'manager-connector/settings',
-];
+// Empty, and it should stay that way. The screen is a Craft utility, which Craft routes, and the two
+// state-changing actions go through Craft's action mechanism — POST and a CSRF token, no URL rule.
+// Nothing this plugin registers can be reached by following a link.
+$permittedCpRoutes = [];
 
 $pluginSourceForRoutes = sourceWithoutComments($sourceDir.'/Plugin.php');
 
@@ -142,8 +141,11 @@ foreach ($sources as $file) {
         $failures[] = "{$relative} does not declare \$allowAnonymous = false (invariant 4).";
     }
 
-    if (! str_contains($contents, '$this->requireAdmin(')) {
-        $failures[] = "{$relative} does not require an administrator (invariant 4).";
+    // Either an administrator or the utility's own permission. Not merely "some permission": the exact
+    // string is asserted so this cannot quietly become a weaker one that every editor holds.
+    if (! str_contains($contents, '$this->requireAdmin(')
+        && ! str_contains($contents, "requirePermission('utility:'.ConnectorUtility::id())")) {
+        $failures[] = "{$relative} does not require an administrator or the utility permission (invariant 4).";
     }
 
     // Every action that changes something has to be POST, or Craft will not enforce CSRF and the route
@@ -151,7 +153,7 @@ foreach ($sources as $file) {
     //
     // Actions that only render are exempt, but by name rather than by inspection: adding a read-only
     // action means adding it here, which is a moment to consider whether it really is one.
-    $readOnlyActions = ['Index'];
+    $readOnlyActions = [];
 
     $actions = preg_match_all('/public function action(\w+)\(/', $contents, $found) ? $found[1] : [];
     $changing = array_values(array_diff($actions, $readOnlyActions));

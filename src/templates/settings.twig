@@ -12,16 +12,7 @@
    screen. That is the point of setting it: on a site configured that way, a hijacked session can only
    ever pair with the platform the operator already chose.
 #}
-{% extends "_layouts/cp.twig" %}
 {% import "_includes/forms.twig" as forms %}
-
-{% set title = "Manager Connector"|t('manager-connector') %}
-{% set crumbs = [
-    { label: "Settings"|t('app'), url: url('settings') },
-    { label: "Plugins"|t('app'), url: url('settings/plugins') },
-] %}
-
-{% block content %}
 
 {% set connection = connection ?? null %}
 
@@ -42,7 +33,7 @@
     <form method="post" accept-charset="UTF-8">
         {{ csrfInput() }}
         {{ actionInput('manager-connector/enrol/pair') }}
-        {{ redirectInput('settings/plugins/manager-connector') }}
+        {{ redirectInput('utilities/manager-connector') }}
 
         {% if configuredUrl %}
             {{ forms.field({
@@ -167,7 +158,7 @@
                     <form method="post" accept-charset="UTF-8">
                         {{ csrfInput() }}
                         {{ actionInput('manager-connector/enrol/disconnect') }}
-                        {{ redirectInput('settings/plugins/manager-connector') }}
+                        {{ redirectInput('utilities/manager-connector') }}
 
                         <div class="buttons">
                             <button type="submit" class="btn"
@@ -194,4 +185,3 @@
         </p>
     </div>
 {% endif %}
-{% endblock %}

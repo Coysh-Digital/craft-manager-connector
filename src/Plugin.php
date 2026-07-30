@@ -19,12 +19,13 @@ use coyshdigital\managerconnector\services\BackupRunner;
 use coyshdigital\managerconnector\services\JobRunner;
 use coyshdigital\managerconnector\services\Reporter;
 use coyshdigital\managerconnector\services\UpdatesReporter;
+use coyshdigital\managerconnector\utilities\ConnectorUtility;
 use craft\base\Model;
 use craft\base\Plugin as BasePlugin;
 use craft\console\Application as ConsoleApplication;
 use craft\helpers\UrlHelper;
-use craft\events\RegisterUrlRulesEvent;
-use craft\web\UrlManager;
+use craft\events\RegisterComponentTypesEvent;
+use craft\services\Utilities;
 use yii\base\Event;
 
 /**
@@ -62,7 +63,7 @@ class Plugin extends BasePlugin
     /**
      * @var string The connector version reported to the platform and signed into every request.
      */
-    public const VERSION = '1.3.0';
+    public const VERSION = '1.4.0';
 
     /**
      * @inheritdoc
@@ -90,15 +91,15 @@ class Plugin extends BasePlugin
             $this->controllerNamespace = 'coyshdigital\\managerconnector\\console\\controllers';
         }
 
-        // One control-panel route: the connector's own screen. The two state-changing actions are
-        // reached through Craft's action mechanism, which requires POST and a CSRF token, so they need
-        // no URL rule of their own — and a route that cannot be visited by following a link is one less
-        // thing to reason about.
+        // The screen is a utility, so Craft routes it — this plugin registers no URL rules at all.
+        // The two state-changing actions are reached through Craft's action mechanism, which requires
+        // POST and a CSRF token, so they need no route either. Nothing here can be reached by following
+        // a link, which is one less thing to reason about.
         Event::on(
-            UrlManager::class,
-            UrlManager::EVENT_REGISTER_CP_URL_RULES,
-            static function (RegisterUrlRulesEvent $event): void {
-                $event->rules['manager-connector/settings'] = 'manager-connector/enrol/index';
+            Utilities::class,
+            Utilities::EVENT_REGISTER_UTILITIES,
+            static function (RegisterComponentTypesEvent $event): void {
+                $event->types[] = ConnectorUtility::class;
             },
         );
     }
@@ -123,8 +124,10 @@ class Plugin extends BasePlugin
     {
         // To the plugin's own page, which is a different URL from this one. Redirecting to the settings
         // URL itself — as this once did — is an infinite loop, and the page could not be opened at all.
+        // To the utility, which is where the screen lives. A different URL from this one, unlike the
+        // version of this method that redirected to the settings page it was called from and looped.
         return Craft::$app->getResponse()->redirect(
-            UrlHelper::cpUrl('manager-connector/settings')
+            UrlHelper::cpUrl('utilities/manager-connector')
         );
     }
 }
