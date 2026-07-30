@@ -38,6 +38,20 @@ Do not take that on trust. See exactly what your site would send:
 php craft manager-connector/preview
 ```
 
+## Documentation
+
+Full documentation lives in the [`docs`](docs/) folder, and is published at
+[coysh.digital/plugins/manager-connector/docs](https://coysh.digital/plugins/manager-connector/docs/).
+This README is the short version; the docs go deeper on pairing, exactly what is
+and is not sent, what each capability permits, how backups work, the security
+model, the console commands, and troubleshooting.
+
+## Requirements
+
+- Craft CMS 5.0 or later
+- PHP 8.2 or later
+- A Manager installation to report to, self-hosted or Manager Cloud
+
 ## Installation
 
 ```bash

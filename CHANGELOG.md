@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.4.1
+
+- An icon, in the same family as the other Coysh Digital Craft plugins: one site reporting outbound to
+  one platform, in the red Manager uses.
+- Full documentation in `docs/`, covering pairing, exactly what is and is not sent, what each capability
+  permits, how backups work, the security model, every console command, and troubleshooting.
+
 ## 1.4.0
 
 - The connector's screen moved from plugin settings to **Utilities**. Not for reachability — a plugin
