@@ -293,6 +293,36 @@ if (preg_match("/const VERSION = '([^']+)'/", $pluginSource, $constant) !== 1) {
 }
 
 // --------------------------------------------------------------------------------------------------
+// The platform is only ever contacted over TLS.
+// --------------------------------------------------------------------------------------------------
+//
+// The specification says TLS remains mandatory and that signing does not replace it. Those are
+// different properties and it is worth being precise about which: a signature makes a request
+// tamper-evident, it does not make it unreadable. Over plain HTTP the enrolment code — a bearer secret
+// until it is consumed — is visible to anything on the path, and so is every inventory report after it.
+//
+// Nothing enforced this until it was checked here: the settings rule supplied https as a *default*
+// scheme, which quietly accepts an explicit http://.
+$checks++;
+
+if (! str_contains($client, 'function requireSecureUrl(')) {
+    $failures[] = 'src/services/Client.php no longer refuses a non-HTTPS platform URL. TLS is mandatory and signing does not replace it.';
+} else {
+    // Every outbound path has to go through it, including the ones that read a stored URL rather than
+    // an argument — a record written by an older build must not be a way round this.
+    $callSites = preg_match_all('/requireSecureUrl\(/', $client);
+
+    if ($callSites < 4) {
+        $failures[] = 'src/services/Client.php defines requireSecureUrl() but does not call it on every outbound path ('
+            .$callSites.' occurrences including the declaration; expected at least 4).';
+    }
+}
+
+if (! str_contains(sourceWithoutComments($sourceDir.'/models/Settings.php'), "'validSchemes' => ['https']")) {
+    $failures[] = 'src/models/Settings.php no longer restricts platformUrl to https.';
+}
+
+// --------------------------------------------------------------------------------------------------
 // Report
 // --------------------------------------------------------------------------------------------------
 

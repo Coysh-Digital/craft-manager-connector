@@ -47,6 +47,10 @@ class Client extends Component
      */
     public function pair(string $platformUrl, string $enrolmentCode, array $keypair): array
     {
+        // Checked before anything is sent. Pairing is the one request that carries a bearer secret —
+        // the enrolment code — so it is the request that must not go out in the clear.
+        $platformUrl = self::requireSecureUrl($platformUrl);
+
         $nonce = Nonce::generate();
 
         $body = json_encode([
@@ -132,7 +136,7 @@ class Client extends Component
             sodium_memzero($secret);
         }
 
-        $response = $this->send($record->platformUrl, $path, $body, [
+        $response = $this->send(self::requireSecureUrl($record->platformUrl), $path, $body, [
             Protocol::HEADER_SITE => $record->siteIdentifier,
             Protocol::HEADER_TIMESTAMP => (string) $timestamp,
             Protocol::HEADER_NONCE => $nonce,
@@ -249,7 +253,7 @@ class Client extends Component
                 'http_errors' => false,
             ]);
 
-            $response = $client->put(rtrim($record->platformUrl, '/').$path, [
+            $response = $client->put(rtrim(self::requireSecureUrl($record->platformUrl), '/').$path, [
                 // Guzzle streams from the handle rather than buffering it.
                 'body' => $handle,
                 'headers' => [
@@ -296,6 +300,33 @@ class Client extends Component
      * @param  array<string, string>  $headers
      * @return array{status: int, body: string, headers: array<string, list<string>>}
      */
+    /**
+     * Refuse a platform URL that is not HTTPS.
+     *
+     * The specification is explicit that TLS remains mandatory and that signing does not replace it,
+     * and until this existed nothing enforced it. A signature protects a request's integrity, not its
+     * confidentiality: over plain HTTP the enrolment code is readable by anything on the path, and so
+     * is every inventory report that follows.
+     *
+     * Deliberately no escape hatch for local development. ddev, and every tunnelling service worth
+     * using, provide real certificates — so the only thing a bypass would enable is the mistake.
+     *
+     * @throws RuntimeException
+     */
+    public static function requireSecureUrl(string $platformUrl): string
+    {
+        $scheme = strtolower((string) parse_url(trim($platformUrl), PHP_URL_SCHEME));
+
+        if ($scheme !== 'https') {
+            throw new RuntimeException(
+                'The Manager platform URL must use HTTPS. A signed request over plain HTTP is still '
+                .'readable in transit, including the enrolment code used to pair.'
+            );
+        }
+
+        return trim($platformUrl);
+    }
+
     private function send(string $platformUrl, string $path, string $body, array $headers): array
     {
         $settings = Plugin::getInstance()->getSettings();

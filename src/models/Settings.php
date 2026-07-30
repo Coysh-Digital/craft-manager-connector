@@ -70,7 +70,9 @@ class Settings extends Model
     {
         return [
             [['platformUrl'], 'string'],
-            [['platformUrl'], 'url', 'defaultScheme' => 'https'],
+            // HTTPS only, not merely defaulted to. 'defaultScheme' fills in a missing scheme but
+            // accepts an explicit http://, which would put the enrolment code on the wire in clear.
+            [['platformUrl'], 'url', 'defaultScheme' => 'https', 'validSchemes' => ['https']],
             [['timeout'], 'integer', 'min' => 1, 'max' => 60],
             [['uploadTimeout'], 'integer', 'min' => 30, 'max' => 7200],
             [['maxBackupMegabytes'], 'integer', 'min' => 1, 'max' => 10240],
