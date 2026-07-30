@@ -38,39 +38,13 @@ class UpdatesController extends BaseController
 
     public function actionIndex(): int
     {
-        if (($refusal = $this->requireActiveConnection()) !== null) {
-            return $refusal;
-        }
-
-        $plugin = $this->plugin();
-
-        if (! $plugin->connection->hasCapability('updates:read')) {
-            $this->stderr("The platform has not granted updates:read to this site.\n", Console::FG_YELLOW);
-
-            return ExitCode::UNAVAILABLE;
-        }
-
-        ['payload' => $payload, 'problems' => $problems] = $plugin->updates->buildValidated($this->force);
-
-        if ($problems !== []) {
-            $this->stderr("This report does not satisfy the agreed schema and was not sent:\n", Console::FG_RED);
-
-            foreach ($problems as $problem) {
-                $this->stderr("  - {$problem}\n");
-            }
-
-            return ExitCode::DATAERR;
-        }
-
         try {
-            $plugin->client->post('/api/connector/v1/updates', $payload);
+            $this->stdout($this->plugin()->tasks->updates((bool) $this->force)."\n", Console::FG_GREEN);
         } catch (Throwable $e) {
-            $this->stderr('Update report failed: '.$e->getMessage()."\n", Console::FG_RED);
+            $this->stderr(ucfirst($e->getMessage())."\n", Console::FG_RED);
 
             return ExitCode::UNAVAILABLE;
         }
-
-        $this->stdout("Updates reported.\n", Console::FG_GREEN);
 
         return ExitCode::OK;
     }

@@ -82,13 +82,32 @@ what actually goes out.
 0 6 * * *   cd /path/to/site && php craft manager-connector/updates
 ```
 
-### Through Craft's queue instead
+### If you cannot use cron
 
-If a queue worker is definitely running, set `useQueue` to `true` in `config/manager-connector.php` and
-the heartbeat will also be pushed through Craft's queue.
+Plenty of Craft sites live on hosting where nobody can add a cron entry. You do not need one.
 
-Leave it off unless you are sure. A stalled queue makes a healthy site look offline, which is a worse
-failure than not having the extra reporting path.
+`webTrigger` is **on by default**, and drives the same schedule from ordinary web traffic. When a task
+is due, the next request to the site pushes a queue job and returns; Craft's queue does the work, so
+the visitor whose request triggered it waits for nothing.
+
+Traffic cannot amplify it. Whether the site gets ten requests an hour or ten thousand, each task fires
+at most once per interval — the claim is an atomic cache write, so two simultaneous requests cannot
+both take it.
+
+What it needs is for Craft's queue to actually run. That is Craft's default (`runQueueAutomatically`).
+If you have turned that off, something else has to run the queue — a queue daemon, `craft-async-queue`,
+or a cron entry, in which case you may as well schedule the connector directly.
+
+Two honest limitations, which is why cron is still the recommendation where it is available:
+
+- **A quiet site reports less often.** No traffic overnight means nothing reported overnight. Manager
+  will notice the gap and say the site is not reporting, which is correct but may not be what you want
+  to see every morning.
+- **It depends on the queue.** A stalled Craft queue means a silent site. With cron, the connector does
+  not depend on the queue at all.
+
+Turn it off with `'webTrigger' => false` in `config/manager-connector.php` if you have cron and would
+rather the schedule came from one place.
 
 ## Settings
 

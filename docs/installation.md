@@ -59,7 +59,23 @@ Full detail in [Pairing](/pairing).
 
 ## Schedule the reports
 
-Nothing is reported until something asks the plugin to report. Add to cron:
+Nothing is reported until something asks the plugin to. There are two ways to arrange that, and the
+second needs no server access at all.
+
+### If you cannot use cron
+
+Nothing to do — it is already on. `webTrigger` drives the schedule from ordinary web traffic: when a
+task is due, the next request pushes a queue job and Craft's queue does the work. Each task fires at
+most once per interval however busy the site is.
+
+It needs Craft's queue to be running, which is Craft's default. See
+[Console commands](/console-commands#if-you-cannot-use-cron) for the two limitations and how to turn it
+off.
+
+### With cron, which is more predictable
+
+Better where you have it, because it does not depend on the queue and does not go quiet when the site
+does. Add to cron:
 
 ```cron
 */5 * * * * cd /path/to/site && php craft manager-connector/heartbeat

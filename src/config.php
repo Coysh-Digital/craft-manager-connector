@@ -12,8 +12,17 @@ return [
     // The Manager platform this site reports to.
     'platformUrl' => '',
 
-    // Send a heartbeat from Craft's queue in addition to cron. Leave off unless a queue worker is
-    // definitely running: otherwise a stalled queue makes a healthy site look offline.
+    // Drive the schedule from ordinary web traffic, for hosting with no cron. On by default.
+    //
+    // Each task fires at most once per interval however much traffic the site gets, and all a request
+    // does is push a queue job — the visitor waits for nothing. Turn it off if you have cron and would
+    // rather the schedule came from one place.
+    //
+    // It needs Craft's queue to actually run. That is Craft's default; if you have set
+    // runQueueAutomatically to false, something else must run the queue or nothing will report.
+    'webTrigger' => true,
+
+    // Kept for compatibility. Superseded by webTrigger, which is what actually drives the schedule.
     'useQueue' => false,
 
     // Seconds to wait for the platform. A slow platform must never become a slow website.

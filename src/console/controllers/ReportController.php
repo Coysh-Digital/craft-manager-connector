@@ -11,6 +11,7 @@ declare(strict_types=1);
 
 namespace coyshdigital\managerconnector\console\controllers;
 
+use coyshdigital\managerconnector\services\Tasks;
 use craft\helpers\Console;
 use Throwable;
 use yii\console\ExitCode;
@@ -25,41 +26,13 @@ class ReportController extends BaseController
 {
     public function actionIndex(): int
     {
-        if (($refusal = $this->requireActiveConnection()) !== null) {
-            return $refusal;
-        }
-
-        $plugin = $this->plugin();
-
-        if (! $plugin->connection->hasCapability('inventory:read')) {
-            $this->stderr("The platform has not granted inventory:read to this site.\n", Console::FG_YELLOW);
-
-            return ExitCode::UNAVAILABLE;
-        }
-
-        ['payload' => $payload, 'problems' => $problems] = $plugin->reporter->buildValidated();
-
-        if ($problems !== []) {
-            // Caught here rather than as a rejection somebody has to go looking for. The platform
-            // validates again on arrival regardless.
-            $this->stderr("This report does not satisfy the agreed schema and was not sent:\n", Console::FG_RED);
-
-            foreach ($problems as $problem) {
-                $this->stderr("  - {$problem}\n");
-            }
-
-            return ExitCode::DATAERR;
-        }
-
         try {
-            $plugin->client->post('/api/connector/v1/inventory', $payload);
+            $this->stdout($this->plugin()->tasks->run(Tasks::REPORT)."\n", Console::FG_GREEN);
         } catch (Throwable $e) {
-            $this->stderr('Report failed: '.$e->getMessage()."\n", Console::FG_RED);
+            $this->stderr(ucfirst($e->getMessage())."\n", Console::FG_RED);
 
             return ExitCode::UNAVAILABLE;
         }
-
-        $this->stdout("Inventory reported.\n", Console::FG_GREEN);
 
         return ExitCode::OK;
     }

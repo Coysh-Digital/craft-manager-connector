@@ -18,11 +18,14 @@ use coyshdigital\managerconnector\services\Connection;
 use coyshdigital\managerconnector\services\BackupRunner;
 use coyshdigital\managerconnector\services\JobRunner;
 use coyshdigital\managerconnector\services\Reporter;
+use coyshdigital\managerconnector\services\Scheduler;
+use coyshdigital\managerconnector\services\Tasks;
 use coyshdigital\managerconnector\services\UpdatesReporter;
 use coyshdigital\managerconnector\utilities\ConnectorUtility;
 use craft\base\Model;
 use craft\base\Plugin as BasePlugin;
 use craft\console\Application as ConsoleApplication;
+use craft\web\Application as CraftWebApplication;
 use craft\helpers\UrlHelper;
 use craft\events\RegisterComponentTypesEvent;
 use craft\services\Utilities;
@@ -53,6 +56,8 @@ use yii\base\Event;
  * @property-read UpdatesReporter $updates
  * @property-read JobRunner $jobs
  * @property-read BackupRunner $backups
+ * @property-read Tasks $tasks
+ * @property-read Scheduler $scheduler
  *
  * @author Coysh Digital
  *
@@ -63,7 +68,7 @@ class Plugin extends BasePlugin
     /**
      * @var string The connector version reported to the platform and signed into every request.
      */
-    public const VERSION = '1.4.1';
+    public const VERSION = '1.5.0';
 
     /**
      * @inheritdoc
@@ -89,6 +94,20 @@ class Plugin extends BasePlugin
 
         if (Craft::$app instanceof ConsoleApplication) {
             $this->controllerNamespace = 'coyshdigital\\managerconnector\\console\\controllers';
+        }
+
+        // The schedule, driven by traffic, for sites with no cron. A listener on requests that were
+        // happening anyway — it reads nothing from the request and there is no URL that reaches it.
+        //
+        // Registered only for web requests. On the console the commands are the schedule.
+        if (! Craft::$app instanceof ConsoleApplication) {
+            Event::on(
+                CraftWebApplication::class,
+                CraftWebApplication::EVENT_AFTER_REQUEST,
+                static function (): void {
+                    Plugin::getInstance()?->scheduler->runDue();
+                },
+            );
         }
 
         // The screen is a utility, so Craft routes it — this plugin registers no URL rules at all.

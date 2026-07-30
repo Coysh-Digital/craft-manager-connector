@@ -30,6 +30,20 @@ class Settings extends Model
     public string $platformUrl = '';
 
     /**
+     * @var bool Drive the schedule from ordinary web traffic, for hosting with no cron.
+     *
+     * On by default, because the alternative failure is a site that pairs successfully and then reports
+     * nothing at all — which looks like a broken plugin rather than a missing scheduled task.
+     *
+     * Costs one cache read per request. When a task is due it pushes a queue job and returns; the
+     * visitor whose request triggered it waits for nothing.
+     *
+     * Cron is still more predictable, and a site with no overnight traffic reports nothing overnight.
+     * Turn this off if you have cron and would rather the schedule came from one place.
+     */
+    public bool $webTrigger = true;
+
+    /**
      * @var bool Whether to send a heartbeat from Craft's queue as well as from cron.
      *
      * Off by default: most installations drive the connector from cron, and a queue that is not
@@ -76,7 +90,7 @@ class Settings extends Model
             [['timeout'], 'integer', 'min' => 1, 'max' => 60],
             [['uploadTimeout'], 'integer', 'min' => 30, 'max' => 7200],
             [['maxBackupMegabytes'], 'integer', 'min' => 1, 'max' => 10240],
-            [['useQueue'], 'boolean'],
+            [['useQueue', 'webTrigger'], 'boolean'],
         ];
     }
 }

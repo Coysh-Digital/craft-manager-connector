@@ -1,5 +1,23 @@
 # Changelog
 
+## 1.5.0
+
+- **Cron is no longer required.** `webTrigger`, on by default, drives the schedule from ordinary web
+  traffic: when a task is due the next request pushes a queue job and returns, and Craft's queue does
+  the work. Plenty of Craft sites run on hosting where nobody can add a cron entry, and requiring one
+  meant the plugin simply did not work there.
+- Traffic cannot amplify it. Each task fires at most once per interval however busy the site is — the
+  claim is an atomic cache write, so two simultaneous requests cannot both take it. Fifteen requests
+  with an empty throttle produce four jobs, one per task.
+- It is not an endpoint: a listener on requests that were happening anyway, reading nothing from the
+  request, with no URL that reaches it.
+- Cron remains the recommendation where it is available, and the documentation says why: a quiet site
+  reports less often, and this depends on Craft's queue running where cron does not.
+- The four tasks now live in one service shared by the console commands and the queue job, so the two
+  routes cannot drift.
+- `useQueue` was declared, documented as working, and never read by anything. Superseded by
+  `webTrigger`, which does what it claimed to.
+
 ## Unreleased
 
 - **Correction to the 1.4.0 note below.** It claimed a plugin settings page stays linked with
