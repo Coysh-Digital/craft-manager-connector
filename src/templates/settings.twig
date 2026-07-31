@@ -41,11 +41,16 @@
                 instructions: "Set in config/manager-connector.php, so it cannot be changed from here."|t('manager-connector'),
             }, '<code>' ~ configuredUrl ~ '</code>') }}
         {% else %}
+            {# Prefilled with Manager Cloud, which is where most sites pair. It is a starting value and
+               not a setting: the field stays editable, and a self-hosted installation replaces it with
+               its own address. Sites that must not choose for themselves set `platformUrl` in
+               config/manager-connector.php, which locks the field entirely — the branch above. #}
             {{ forms.autosuggestField({
                 label: "Manager platform"|t('manager-connector'),
-                instructions: "The address of your Manager installation. Must be HTTPS — a signed request over plain HTTP is still readable in transit, including the code below. Check it carefully: this is where the site's operational state will be sent."|t('manager-connector'),
+                instructions: "The address of your Manager installation. Defaults to Manager Cloud; replace it if you self-host. Must be HTTPS — a signed request over plain HTTP is still readable in transit, including the code below. Check it carefully: this is where the site's operational state will be sent."|t('manager-connector'),
                 id: 'platformUrl',
                 name: 'platformUrl',
+                value: 'https://console.managerforcraft.com',
                 placeholder: 'https://manager.example.org',
                 suggestEnvVars: true,
                 required: true,

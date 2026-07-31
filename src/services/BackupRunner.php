@@ -3,7 +3,7 @@
 /**
  * Manager Connector plugin for Craft CMS 4.x and 5.x
  *
- * @link      https://coysh.digital
+ * @link      https://managerforcraft.com
  * @copyright Copyright (c) Coysh Digital
  */
 

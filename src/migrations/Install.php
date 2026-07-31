@@ -3,7 +3,7 @@
 /**
  * Manager Connector plugin for Craft CMS 4.x and 5.x
  *
- * @link      https://coysh.digital
+ * @link      https://managerforcraft.com
  * @copyright Copyright (c) Coysh Digital
  */
 
@@ -49,6 +49,13 @@ class Install extends Migration
             // configured tells us nothing, and a connector that was told nothing seals nothing
             // rather than guessing.
             'platformBackupPublicKey' => $this->string(64),
+
+            // The artifact format this site has committed to. A ratchet: raised to v2 the first time
+            // this site pins recovery fingerprints or completes a v2 backup, and never lowered by a
+            // response. Craft marks every non-install migration as applied on a fresh install without
+            // running it, so a column that exists only in m260805_090000 exists only on sites that
+            // upgraded into it — it has to be created here as well.
+            'backupFormatFloor' => $this->string(8)->notNull()->defaultValue('v1'),
 
             'capabilities' => $this->text(),
             'state' => $this->string(32)->notNull()->defaultValue(ConnectionRecord::STATE_ACTIVE),

@@ -1,5 +1,46 @@
 # Changelog
 
+## 1.9.1
+
+A fresh install could not read `backupFormatFloor`, and the plugin now points at managerforcraft.com.
+
+### The connection table was missing a column on fresh installs
+
+`Getting unknown property: ...ConnectionRecord::backupFormatFloor`, raised on the backup path where
+`BackupRunner` asks for the floor before choosing a format.
+
+The column arrived in 1.7.0 with `m260805_090000_add_backup_format_floor`, but it was never added to
+`Install`. Craft installs a plugin by running the install migration and then marking every other
+migration as applied **without running it** (`craft\base\Plugin::install()`), so the two populations
+diverged: a site that *upgraded* into 1.7.0 ran the migration and has the column, and a site that
+*installed* 1.7.0 or later from scratch has the migration recorded as done and no column at all.
+
+That is 1.7.0, 1.7.1, 1.8.0 and 1.9.0 — every release since the ratchet was introduced. If your sites
+were upgraded rather than freshly installed, none of them were affected.
+
+`Install` now creates the column, which fixes the next fresh install but not the ones already out
+there, whose migration history says the work is finished. So there is also a new migration,
+`m260731_210000_backfill_backup_format_floor`, which adds the column where it is missing. Editing the
+1.7.0 migration would have done nothing on exactly the sites that need it.
+
+Both migrations are idempotent and additive, and `v1` is the correct starting value: a site that had
+genuinely taken v2 backups already had the column. `schemaVersion` moves to 1.3.0 so Craft runs the
+repair on update.
+
+### Manager for Craft, not coysh.digital
+
+The `@link` header on all 33 source files, the Composer author homepage and the plugin's
+`developerUrl` now point at managerforcraft.com. The security contact stays `hello@coysh.digital` —
+that is a reporting address rather than a link, and moving it would break the path this plugin asks
+people to use.
+
+### Pairing defaults to Manager Cloud
+
+The platform field on the pairing screen starts at `https://console.managerforcraft.com`, which is
+where most sites pair. It is a starting value and not a setting: the field is still editable, and a
+self-hosted installation replaces it. Setting `platformUrl` in `config/manager-connector.php` still
+locks the field, as before.
+
 ## 1.9.0
 
 Craft 4 is supported. Nothing was removed to get there, and no capability behaves differently on one
