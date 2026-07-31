@@ -1,7 +1,7 @@
 <?php
 
 /**
- * Manager Connector plugin for Craft CMS 5.x
+ * Manager Connector plugin for Craft CMS 4.x and 5.x
  *
  * @link      https://coysh.digital
  * @copyright Copyright (c) Coysh Digital
@@ -156,7 +156,18 @@ class Reporter extends Component
                 $edition = $edition->value;
             }
 
-            return match ((int) $edition) {
+            $edition = (int) $edition;
+
+            // The int ladder is not stable across the versions this plugin now supports. Craft added
+            // the Team edition in 4.5 and inserted it at 1, moving Pro from 1 to 2 — so on Craft 4.0
+            // to 4.4 the same integer means Pro, and reading it with the modern ladder reports a Pro
+            // site as "team". Wrong quietly, in a field an operator would have no reason to distrust,
+            // which is why it is worth the version check rather than a comment.
+            if ($edition === 1 && version_compare(Craft::$app->getVersion(), '4.5', '<')) {
+                return 'pro';
+            }
+
+            return match ($edition) {
                 0 => 'solo',
                 1 => 'team',
                 default => 'pro',

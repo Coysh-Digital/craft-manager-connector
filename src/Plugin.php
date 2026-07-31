@@ -1,7 +1,7 @@
 <?php
 
 /**
- * Manager Connector plugin for Craft CMS 5.x
+ * Manager Connector plugin for Craft CMS 4.x and 5.x
  *
  * @link      https://coysh.digital
  * @copyright Copyright (c) Coysh Digital
@@ -76,7 +76,7 @@ class Plugin extends BasePlugin
     /**
      * @var string The connector version reported to the platform and signed into every request.
      */
-    public const VERSION = '1.8.0';
+    public const VERSION = '1.9.0';
 
     /**
      * @inheritdoc
@@ -136,11 +136,33 @@ class Plugin extends BasePlugin
         // a link, which is one less thing to reason about.
         Event::on(
             Utilities::class,
-            Utilities::EVENT_REGISTER_UTILITIES,
+            self::registerUtilitiesEvent(),
             static function(RegisterComponentTypesEvent $event): void {
                 $event->types[] = ConnectorUtility::class;
             },
         );
+    }
+
+    /**
+     * The name of the event Craft fires when it collects utility types.
+     *
+     * Craft 4 calls it `registerUtilityTypes` and Craft 5 renamed it to `registerUtilities`. The
+     * event class and the `$event->types[]` contract behind it are identical, so the rename is the
+     * whole of the difference — but getting it wrong does not raise anything. Yii would simply
+     * attach a listener to an event nothing dispatches, the utility would never register, and on
+     * Craft 4 that means no pairing screen at all: a plugin that installs cleanly, reports nothing,
+     * and offers no visible way to find out why.
+     *
+     * Resolved by constant rather than by Craft version, so it stays correct if either major
+     * backports the other's name.
+     */
+    private static function registerUtilitiesEvent(): string
+    {
+        $modern = Utilities::class . '::EVENT_REGISTER_UTILITIES';
+
+        return defined($modern)
+            ? (string) constant($modern)
+            : (string) constant(Utilities::class . '::EVENT_REGISTER_UTILITY_TYPES');
     }
 
     /**

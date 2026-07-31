@@ -1,0 +1,19 @@
+<!--
+  The utility's icon on Craft 4, which asks for a path to an SVG rather than the icon name Craft 5
+  takes. Drawn here rather than lifted from an icon set: Font Awesome's free tier is CC BY 4.0 and
+  carries an attribution requirement that has no sensible home inside a Craft utility.
+
+  Monochrome and filled, because Craft masks control-panel icons and discards colour and stroke.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+  <!-- The dish: a bowl opening up and to the right, struck from two circles. -->
+  <path d="M3.6 20.4a9.6 9.6 0 0 1 0-13.6 1 1 0 0 1 1.4 0l12.2 12.2a1 1 0 0 1 0 1.4 9.6 9.6 0 0 1-13.6 0Zm1.5-11.6a7.6 7.6 0 0 0 10.1 10.1Z" />
+
+  <!-- The feed arm and its horn, offset clear of the rim. -->
+  <path d="M14.9 6.2a1 1 0 0 1 1.4 0l1.5 1.5a1 1 0 0 1-1.4 1.4l-1.5-1.5a1 1 0 0 1 0-1.4Z" />
+  <circle cx="19.1" cy="10.4" r="2.1" />
+
+  <!-- Two signal arcs, the thing the plugin is actually about. -->
+  <path d="M13.2 4.1a1 1 0 0 1 1-1 6.7 6.7 0 0 1 6.7 6.7 1 1 0 0 1-2 0 4.7 4.7 0 0 0-4.7-4.7 1 1 0 0 1-1-1Z" />
+  <path d="M13.2 1a1 1 0 0 1 1-1A9.8 9.8 0 0 1 24 9.8a1 1 0 0 1-2 0A7.8 7.8 0 0 0 14.2 2a1 1 0 0 1-1-1Z" />
+</svg>

@@ -1,7 +1,7 @@
 <?php
 
 /**
- * Manager Connector plugin for Craft CMS 5.x
+ * Manager Connector plugin for Craft CMS 4.x and 5.x
  *
  * @link      https://coysh.digital
  * @copyright Copyright (c) Coysh Digital
@@ -149,9 +149,13 @@ class SystemReporter extends Component
     /**
      * Where one volume's files actually are.
      *
-     * A Craft 5 volume is a filesystem *and a subpath within it*, and several volumes routinely share
-     * one filesystem — Craft has a validator dedicated to stopping their subpaths overlapping, which
-     * only makes sense because the arrangement is expected. Reading the filesystem's own root and
+     * A volume is a filesystem *and a subpath within it* — since Craft 4.4, and throughout 5 — and
+     * several volumes routinely share one filesystem. Craft has a validator dedicated to stopping
+     * their subpaths overlapping, which only makes sense because the arrangement is expected. On
+     * Craft 4.0 to 4.3 there is no subpath at all and one volume is one filesystem, which is exactly
+     * what the method_exists guard below is for.
+     *
+     * Reading the filesystem's own root and
      * stopping there is therefore wrong in the common case rather than the exotic one: every volume
      * on a shared filesystem measured the same tree and reported byte-identical figures, and because
      * the platform sums them for its total, a site with three such volumes read three times its real

@@ -1,7 +1,7 @@
 <?php
 
 /**
- * Manager Connector plugin for Craft CMS 5.x
+ * Manager Connector plugin for Craft CMS 4.x and 5.x
  *
  * @link      https://coysh.digital
  * @copyright Copyright (c) Coysh Digital
@@ -56,9 +56,29 @@ class ConnectorUtility extends Utility
         return Craft::t('manager-connector', 'Manager Connector');
     }
 
+    /**
+     * The icon on Craft 5, which takes a name from the set the control panel already ships.
+     */
     public static function icon(): ?string
     {
         return 'satellite-dish';
+    }
+
+    /**
+     * The icon on Craft 4, which takes a path to an SVG instead.
+     *
+     * Both accessors live here on purpose. Craft 4 calls `iconPath()` and has never heard of
+     * `icon()`; Craft 5 calls `icon()` and ignores this. Declaring both is what lets one class serve
+     * both majors, and it is the only genuine API divergence between them in this plugin — the rest
+     * of the connector's Craft surface is identical across the two.
+     */
+    public static function iconPath(): ?string
+    {
+        $path = Craft::getAlias('@coyshdigital/managerconnector/icons/satellite-dish.svg');
+
+        // Craft renders the utility without an icon rather than failing, which is the right trade for
+        // a decoration. getAlias() returns false on an unregistered alias, hence the string check.
+        return is_string($path) && is_file($path) ? $path : null;
     }
 
     /**
