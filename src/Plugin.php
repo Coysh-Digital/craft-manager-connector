@@ -3,7 +3,7 @@
 /**
  * Manager Connector plugin for Craft CMS 4.x and 5.x
  *
- * @link      https://coysh.digital
+ * @link      https://managerforcraft.com
  * @copyright Copyright (c) Coysh Digital
  */
 
@@ -76,12 +76,12 @@ class Plugin extends BasePlugin
     /**
      * @var string The connector version reported to the platform and signed into every request.
      */
-    public const VERSION = '1.9.0';
+    public const VERSION = '1.9.1';
 
     /**
      * @inheritdoc
      */
-    public string $schemaVersion = '1.2.0';
+    public string $schemaVersion = '1.3.0';
 
     /**
      * @inheritdoc
