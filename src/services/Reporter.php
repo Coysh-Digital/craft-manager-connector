@@ -16,6 +16,7 @@ use coyshdigital\managerprotocol\InventorySections;
 use coyshdigital\managerprotocol\SchemaValidator;
 use Craft;
 use craft\base\Component;
+use craft\queue\Queue as CraftQueue;
 use Throwable;
 
 /**
@@ -149,6 +150,12 @@ class Reporter extends Component
                 return strtolower((string) $edition->name);
             }
 
+            // Craft 5 makes this a backed enum, so it has a value rather than being castable.
+            // Older shapes were plain ints, and both reach here from a property with no declared type.
+            if ($edition instanceof \BackedEnum) {
+                $edition = $edition->value;
+            }
+
             return match ((int) $edition) {
                 0 => 'solo',
                 1 => 'team',
@@ -276,10 +283,17 @@ class Reporter extends Component
     {
         $queue = Craft::$app->getQueue();
 
+        // Craft's own queue reports these totals; the yii\queue\Queue interface it is typed as does
+        // not declare them. A site running a replacement queue driver is reported as zero rather than
+        // fataling, which is the same answer safely() would have produced and one query cheaper.
+        if (!$queue instanceof CraftQueue) {
+            return ['pending' => 0, 'reserved' => 0, 'failed' => 0];
+        }
+
         return [
-            'pending' => $this->safely(static fn(): int => (int) $queue->getTotalWaiting(), 0),
-            'reserved' => $this->safely(static fn(): int => (int) $queue->getTotalReserved(), 0),
-            'failed' => $this->safely(static fn(): int => (int) $queue->getTotalFailed(), 0),
+            'pending' => $this->safely(static fn(): int => $queue->getTotalWaiting(), 0),
+            'reserved' => $this->safely(static fn(): int => $queue->getTotalReserved(), 0),
+            'failed' => $this->safely(static fn(): int => $queue->getTotalFailed(), 0),
         ];
     }
 

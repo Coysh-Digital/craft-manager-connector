@@ -113,6 +113,9 @@ class Plugin extends BasePlugin
                 CraftWebApplication::class,
                 CraftWebApplication::EVENT_AFTER_REQUEST,
                 static function(): void {
+                    // Bare, like every other service call in this plugin. Craft types getInstance()
+                    // as returning the plugin rather than a nullable, and this listener is only
+                    // registered on web requests, where the plugin is by definition loaded.
                     $plugin = Plugin::getInstance();
 
                     // Timing first, and separately, because the two have different failure modes and
@@ -120,9 +123,9 @@ class Plugin extends BasePlugin
                     // into a fixed-size cache ring — no URL, no visitor, no address — and swallows
                     // everything, because a visitor's page must not fail because a measurement of it
                     // did. See ResponseSampler for why this is render time and not TTFB.
-                    $plugin?->responseSampler->record();
+                    $plugin->responseSampler->record();
 
-                    $plugin?->scheduler->runDue();
+                    $plugin->scheduler->runDue();
                 },
             );
         }

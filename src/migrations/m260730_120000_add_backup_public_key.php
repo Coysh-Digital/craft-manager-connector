@@ -30,7 +30,7 @@ class m260730_120000_add_backup_public_key extends Migration
             $this->addColumn(
                 ConnectionRecord::tableName(),
                 'platformBackupPublicKey',
-                $this->string(64)->after('platformPublicKey'),
+                (string) $this->string(64)->after('platformPublicKey'),
             );
         }
 

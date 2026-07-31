@@ -36,7 +36,7 @@ class m260805_090000_add_backup_format_floor extends Migration
         $table = '{{%managerconnector_connection}}';
 
         if (!$this->db->columnExists($table, 'backupFormatFloor')) {
-            $this->addColumn($table, 'backupFormatFloor', $this->string(8)->notNull()->defaultValue('v1')->after('platformBackupPublicKey'));
+            $this->addColumn($table, 'backupFormatFloor', (string) $this->string(8)->notNull()->defaultValue('v1')->after('platformBackupPublicKey'));
         }
 
         return true;
