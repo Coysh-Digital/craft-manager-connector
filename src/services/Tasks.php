@@ -100,6 +100,29 @@ class Tasks extends Component
         };
     }
 
+    /**
+     * A task the platform has not given this site permission to perform.
+     *
+     * Returned, not thrown, and the distinction is the whole point of this method.
+     *
+     * Being refused is the permission system working. Manager's own interface says as much — "a
+     * security rule whose capability is missing is skipped rather than passed" — and a site owner
+     * who declines to report sign-in counters has made a choice, not a mistake. Throwing turned that
+     * choice into a failed queue job every thirty minutes, in *their* control panel, from the plugin
+     * that is supposed to be watching their site. The first evidence of this product many people
+     * would ever see is a growing list of failures.
+     *
+     * It is still recorded: {@see \coyshdigital\managerconnector\jobs\RunTask} logs the outcome, so
+     * "why is nothing being reported" has an answer in the log without also being an alarm.
+     *
+     * Not sticky, either. The capability list is refreshed from the platform's response to the jobs
+     * task, which runs every five minutes, so granting one takes effect on its own.
+     */
+    private function skipped(string $capability): string
+    {
+        return "Skipped: the platform has not granted {$capability} to this site.";
+    }
+
     public function heartbeat(): string
     {
         $this->requireActiveConnection();
@@ -116,7 +139,7 @@ class Tasks extends Component
         $plugin = Plugin::getInstance();
 
         if (!$plugin->connection->hasCapability('inventory:read')) {
-            throw new RuntimeException('the platform has not granted inventory:read to this site');
+            return $this->skipped('inventory:read');
         }
 
         ['payload' => $payload, 'problems' => $problems] = $plugin->reporter->buildValidated();
@@ -141,7 +164,7 @@ class Tasks extends Component
         $plugin = Plugin::getInstance();
 
         if (!$plugin->connection->hasCapability('updates:read')) {
-            throw new RuntimeException('the platform has not granted updates:read to this site');
+            return $this->skipped('updates:read');
         }
 
         ['payload' => $payload, 'problems' => $problems] = $plugin->updates->buildValidated($force);
@@ -167,7 +190,7 @@ class Tasks extends Component
         $plugin = Plugin::getInstance();
 
         if (!$plugin->connection->hasCapability('runtime:read')) {
-            throw new RuntimeException('the platform has not granted runtime:read to this site');
+            return $this->skipped('runtime:read');
         }
 
         ['payload' => $payload, 'problems' => $problems] = $plugin->system->buildValidated();
@@ -193,7 +216,7 @@ class Tasks extends Component
         $plugin = Plugin::getInstance();
 
         if (!$plugin->connection->hasCapability('logins:read')) {
-            throw new RuntimeException('the platform has not granted logins:read to this site');
+            return $this->skipped('logins:read');
         }
 
         ['payload' => $payload, 'problems' => $problems] = $plugin->logins->buildValidated();

@@ -1,5 +1,26 @@
 # Changelog
 
+## 1.7.1
+
+A capability that has not been granted is no longer an error.
+
+Four tasks checked whether the platform had granted the capability they need and threw if it had
+not. On Craft that means a failed queue job, and the schedule repeats — so a site whose owner had
+not granted `logins:read` collected a failed job every thirty minutes, indefinitely, in their own
+control panel, from the plugin that is meant to be watching the site for them.
+
+Being refused is the permission system working, not a fault. Manager's own interface says so in as
+many words: a capability that is missing is *skipped rather than passed*. These tasks now agree with
+it — they return a "skipped" outcome, which `RunTask` logs like any other, so the reason is still
+findable without also being an alarm.
+
+Nothing becomes stuck as a result. The capability list is refreshed from the platform's response to
+the jobs task, which runs every five minutes, so granting one takes effect on its own.
+
+Affects `report` (`inventory:read`), `updates` (`updates:read`), `system` (`runtime:read`) and
+`logins` (`logins:read`). Nothing else changes: the checks still happen, and a task without
+permission still sends nothing.
+
 ## 1.7.0
 
 Backups this platform cannot read.
