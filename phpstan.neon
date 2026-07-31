@@ -5,3 +5,9 @@ parameters:
     level: 5
     paths:
         - src
+
+    # This plugin is analysed against both Craft 4 and Craft 5, and the two disagree about the type of
+    # `Craft::$app->edition` — an int on 4, a backed enum on 5. Reporter::editionHandle() handles both
+    # shapes deliberately, so against either major on its own PHPStan is correct that half those checks
+    # are unreachable, and wrong that they should be removed. Trusting the docblock less is the fix.
+    treatPhpDocTypesAsCertain: false

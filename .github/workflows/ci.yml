@@ -29,19 +29,41 @@ jobs:
         run: php bin/verify-invariants.php
 
   analyse:
-    name: Style and static analysis
+    name: Style and static analysis (Craft ${{ matrix.craft }}, PHP ${{ matrix.php }})
     runs-on: ubuntu-latest
+
+    # Both majors are analysed, and this matrix is load-bearing rather than thorough-looking. Craft 4
+    # and 5 differ in exactly two places that matter to this plugin — the utility registration event
+    # was renamed, and `Craft::$app->edition` went from int to backed enum — and neither raises an
+    # error at boot. Attaching a listener to an event nothing dispatches is silent, so a plugin built
+    # against the wrong constant installs cleanly on Craft 4 and simply has no pairing screen. The
+    # Craft 4 leg caught precisely that, which is the argument for keeping it.
+    #
+    # PHP tracks the Craft leg rather than being crossed with it: 8.1 is the floor and only Craft 4
+    # runs there, 8.4 is the newest supported and only Craft 5 does. Crossing them would quadruple a
+    # job to cover combinations nobody ships.
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - craft: '^4.4'
+            php: '8.1'
+          - craft: '^5.0'
+            php: '8.4'
 
     steps:
       - uses: actions/checkout@v4
 
       - uses: shivammathur/setup-php@v2
         with:
-          php-version: '8.2'
+          php-version: ${{ matrix.php }}
           extensions: sodium
           coverage: none
 
-      - run: composer install --no-interaction --no-progress --prefer-dist
+      - name: Pin the Craft major under test
+        run: composer require "craftcms/cms:${{ matrix.craft }}" --no-update --no-interaction
+
+      - run: composer update --no-interaction --no-progress --prefer-dist
 
       - run: composer check-cs
 
@@ -49,5 +71,14 @@ jobs:
 
       # New connector dependencies are reviewed more strictly than dashboard ones, so an advisory
       # here blocks rather than warns.
+      #
+      # Craft 5 only, and not because the Craft 4 leg is trusted less. Craft 4 pins `twig/twig
+      # ~3.19.0`, which carries published advisories with no fix inside that constraint — so the step
+      # would be permanently red there through no fault of this plugin, and a check that is always
+      # red carries no information. What it is actually guarding is this connector's own dependency
+      # surface, which is `manager-protocol` and ext-sodium and is identical on both legs, so auditing
+      # it once covers it. The Craft 4 Twig advisories are real and are a fact about Craft 4 that
+      # Manager will report on any site running it; they are not something this repository can fix.
       - name: Dependency advisories
+        if: matrix.craft == '^5.0'
         run: composer audit --locked

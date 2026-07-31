@@ -9,7 +9,7 @@ to your own work, and a copyleft licence there would raise a question you should
 a lawyer before you can monitor your own websites. Read it before you install it. That is what it is
 here for.
 
-Requires PHP 8.2+ and Craft CMS 5.0+.
+Requires PHP 8.1+ and Craft CMS 4.4+ or 5.0+.
 
 ## What it does
 
@@ -52,9 +52,10 @@ work, the security model, the console commands, and troubleshooting.
 
 ## Requirements
 
-- Craft CMS 5.0 or later
-- PHP 8.2 or later
-- Manager Cloud or Manager Self-Hosted to report to
+- Craft CMS 4.4 or later, or Craft CMS 5.0 or later
+- PHP 8.1 or later
+  (Craft 4 itself runs on 8.0.2+, but this plugin does not — see the changelog for why)
+- A Manager installation to report to, self-hosted or Manager Cloud
 
 ## Installation
 

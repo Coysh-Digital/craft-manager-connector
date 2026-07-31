@@ -1,31 +1,68 @@
 # Changelog
 
-## 1.8.1
+## 1.9.0
 
-A failed request says which failure it was.
+Craft 4 is supported. Nothing was removed to get there, and no capability behaves differently on one
+major than the other.
 
-When the platform refuses something, it answers with a correlation identifier — in the body, and in
-the `Manager-Correlation-Id` header. The connector only ever read the body, which was enough right up
-until the failure that mattered.
+Requires `craftcms/cms: ^4.4 || ^5.0`, `php: >=8.1` and `manager-protocol: ^1.4`.
 
-A site reported every backup failing with:
+### Why this is a small change
 
-```
-RuntimeException: The platform rejected the request (HTTP 500). Correlation ID: unknown
-```
+The connector barely touches Craft. Its whole surface is twenty imported classes, about twenty-eight
+`Craft::$app` call sites, one Twig template and one table — and it reads no elements at all, so
+Craft 5's entrification and the dropped `content` table never mattered to it. Every one of those
+classes exists in Craft 4 under the same name.
 
-An HTTP 500 is by definition the case nobody wrote a handler for, so the response was never shaped by
-the platform's own code and its body carried no identifier. The header did. "unknown" therefore meant
-"I did not look in the other place", and the operator was left with a site that would not back up and
-nothing to search the platform's log for.
+Three things were already version-tolerant and needed nothing: `Reporter::queue()` already
+`instanceof`-guards `craft\queue\Queue`, `SystemReporter::volumePath()` already reaches `getSubpath`
+through `method_exists` (Craft 4.0 to 4.3 has no volume subpath and one volume is one filesystem),
+and `editionHandle()` already read the edition through enum, object and int shapes.
 
-All three places that report a refusal — pairing, a JSON request, and an artifact upload — now prefer
-the body and fall back to the header. The message is unchanged in shape, so an operator holding an
-older screenshot still recognises it, and "unknown" is still possible: a proxy between the site and
-the platform can answer with neither.
+### The one that would have shipped broken
 
-Nothing else changed. No new dependency, no new request, and the plugin asks the platform for nothing
-it was not already asking for.
+Craft renamed the utility registration event: `EVENT_REGISTER_UTILITY_TYPES` on 4,
+`EVENT_REGISTER_UTILITIES` on 5. Same event class, same `$event->types[]` contract, different
+constant.
+
+Getting this wrong raises nothing. Yii attaches the listener to an event nothing dispatches, the
+utility never registers, and on Craft 4 that means **no pairing screen at all** — a plugin that
+installs cleanly, reports nothing, and offers no visible reason why. `Plugin::registerUtilitiesEvent()`
+now resolves it by constant rather than by Craft version, so it stays correct if either major
+backports the other's name.
+
+This was found by running PHPStan against Craft 4's real signatures, not by reading the source. It
+had already survived a careful read of the whole Craft surface, which is the argument for the CI
+matrix below.
+
+### The rest
+
+- `ConnectorUtility` declares both `icon()` and `iconPath()`. Craft 5 takes an icon name, Craft 4
+  takes a path to an SVG; each major calls the one it knows and ignores the other. The SVG is drawn
+  in this repository rather than lifted from an icon set, because Font Awesome's free tier is CC BY
+  4.0 and the attribution requirement has no sensible home inside a Craft utility.
+- `editionHandle()` no longer reports a Pro site as `team` on Craft 4.0 to 4.4. Craft added the Team
+  edition in 4.5 and inserted it at 1, moving Pro from 1 to 2 — so on older 4.x the same integer
+  means Pro. Wrong quietly, in a field an operator would have no reason to distrust.
+
+### What holds it
+
+CI now analyses both majors: Craft 4.4 on PHP 8.1, Craft 5.0 on PHP 8.4. That is the job that caught
+the event rename, and it is the reason to keep paying for it — both differences between the majors
+are silent at runtime, so neither would show up as a failing build without it.
+
+The advisories step runs on the Craft 5 leg only. Craft 4 pins `twig/twig ~3.19.0`, which carries
+published advisories with no fix inside that constraint, so the step would be permanently red there
+through no fault of this plugin — and a check that is always red carries no information. **This is
+worth knowing before adopting Craft 4 support:** it is a real fact about Craft 4 that Manager will
+report as a finding on any site running it, and nothing in this repository can fix it.
+
+### PHP 8.1, not 8.0.2
+
+Craft 4 itself runs on 8.0.2+, so this does not reach every Craft 4 site. Going lower meant removing
+`readonly` from thirteen promoted properties in `manager-protocol` — on `CanonicalRequest`,
+`CanonicalResponse` and `SchemaValidator`, which are the objects a signature is computed over.
+Trading their immutability for the sites still on 8.0 was judged not worth it.
 
 ## 1.8.0
 

@@ -1,7 +1,7 @@
 <?php
 
 /**
- * Manager Connector plugin for Craft CMS 5.x
+ * Manager Connector plugin for Craft CMS 4.x and 5.x
  *
  * @link      https://coysh.digital
  * @copyright Copyright (c) Coysh Digital
