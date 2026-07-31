@@ -68,7 +68,7 @@ class Client extends Component
         if ($response['status'] !== 200) {
             throw new RuntimeException(
                 'Pairing was refused by the platform. Correlation ID: '
-                . ($decoded['correlation_id'] ?? 'unknown')
+                . $this->correlationFrom($decoded, $response['headers'])
             );
         }
 
@@ -150,7 +150,7 @@ class Client extends Component
             throw new RuntimeException(sprintf(
                 'The platform rejected the request (HTTP %d). Correlation ID: %s',
                 $response['status'],
-                $decoded['correlation_id'] ?? 'unknown',
+                $this->correlationFrom($decoded, $response['headers']),
             ));
         }
 
@@ -394,7 +394,7 @@ class Client extends Component
             throw new RuntimeException(sprintf(
                 'The platform rejected the artifact (HTTP %d). Correlation ID: %s',
                 $response->getStatusCode(),
-                $decoded['correlation_id'] ?? 'unknown',
+                $this->correlationFrom($decoded, $response->getHeaders()),
             ));
         }
 
@@ -475,6 +475,44 @@ class Client extends Component
         $decoded = json_decode($body, true);
 
         return is_array($decoded) ? $decoded : [];
+    }
+
+    /**
+     * The identifier that ties this failure to a line in the platform's log.
+     *
+     * The body is preferred, because a rejection the platform composed deliberately puts it there.
+     * The header is the fallback, and it is the case that matters: an *unhandled* failure on the
+     * platform produces a body this site's operator cannot rely on — Laravel's own error shape, with
+     * no correlation identifier in it — so the connector reported "Correlation ID: unknown" and left
+     * nobody anything to search for. That was the whole of what a site could say about a backup that
+     * failed every time.
+     *
+     * @param  array<string, mixed>  $decoded
+     * @param  array<string, list<string>>  $headers
+     */
+    private function correlationFrom(array $decoded, array $headers): string
+    {
+        $fromBody = $decoded['correlation_id'] ?? null;
+
+        if (is_string($fromBody) && $fromBody !== '') {
+            return $fromBody;
+        }
+
+        foreach ($headers as $name => $values) {
+            if (strcasecmp($name, Protocol::HEADER_CORRELATION_ID) !== 0) {
+                continue;
+            }
+
+            $value = $values[0] ?? '';
+
+            if ($value !== '') {
+                return $value;
+            }
+        }
+
+        // Still possible, and still worth saying plainly: a proxy or a gateway between this site and
+        // the platform can answer without either.
+        return 'unknown';
     }
 
     /**

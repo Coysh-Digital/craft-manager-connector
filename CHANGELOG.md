@@ -1,5 +1,32 @@
 # Changelog
 
+## 1.8.1
+
+A failed request says which failure it was.
+
+When the platform refuses something, it answers with a correlation identifier — in the body, and in
+the `Manager-Correlation-Id` header. The connector only ever read the body, which was enough right up
+until the failure that mattered.
+
+A site reported every backup failing with:
+
+```
+RuntimeException: The platform rejected the request (HTTP 500). Correlation ID: unknown
+```
+
+An HTTP 500 is by definition the case nobody wrote a handler for, so the response was never shaped by
+the platform's own code and its body carried no identifier. The header did. "unknown" therefore meant
+"I did not look in the other place", and the operator was left with a site that would not back up and
+nothing to search the platform's log for.
+
+All three places that report a refusal — pairing, a JSON request, and an artifact upload — now prefer
+the body and fall back to the header. The message is unchanged in shape, so an operator holding an
+older screenshot still recognises it, and "unknown" is still possible: a proxy between the site and
+the platform can answer with neither.
+
+Nothing else changed. No new dependency, no new request, and the plugin asks the platform for nothing
+it was not already asking for.
+
 ## 1.8.0
 
 Volumes are measured where their files actually are, and update reports say what changed.
