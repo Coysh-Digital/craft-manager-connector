@@ -84,6 +84,13 @@ class SystemReporter extends Component
         $budget = max(1, Plugin::getInstance()->getSettings()->storageWalkSeconds);
         $deadline = microtime(true) + $budget;
 
+        // Walks already done this run, by resolved path. Craft forbids one volume's subpath from
+        // overlapping another's on the same filesystem, so two volumes should never resolve to the
+        // same directory — but the budget above is shared by every walk in this method, and a
+        // misconfiguration that made them collide would spend it twice and leave the storage
+        // directory unmeasured. Cheaper to remember than to re-walk.
+        $measured = [];
+
         $volumes = [];
 
         foreach ($this->safely(static fn(): array => Craft::$app->getVolumes()->getAllVolumes(), []) as $volume) {
@@ -93,7 +100,7 @@ class SystemReporter extends Component
                 continue;
             }
 
-            $volumes[] = $this->measureVolume($volume, $handle, $deadline);
+            $volumes[] = $this->measureVolume($volume, $handle, $deadline, $measured);
         }
 
         $storagePath = $this->safely(static fn(): string => Craft::$app->getPath()->getStoragePath(), '');
@@ -118,26 +125,18 @@ class SystemReporter extends Component
     }
 
     /**
+     * @param array<string, array{bytes: int, files: int, complete: bool}> $measured
      * @return array<string, mixed>
      */
-    private function measureVolume(mixed $volume, string $handle, float $deadline): array
+    private function measureVolume(mixed $volume, string $handle, float $deadline, array &$measured): array
     {
-        // Only volumes backed by the local filesystem can be walked. A remote adapter would mean an
-        // API call per directory to a third party, billed to the site, to satisfy a dashboard —
-        // reported as unmeasured instead, which is the honest answer.
-        $path = $this->safely(static function() use ($volume): ?string {
-            $fs = $volume->getFs();
+        $path = $this->volumePath($volume);
 
-            $root = $fs->path ?? null;
-
-            return is_string($root) && $root !== '' ? Craft::parseEnv($root) : null;
-        }, null);
-
-        if (!is_string($path) || !is_dir($path)) {
+        if ($path === null || !is_dir($path)) {
             return ['handle' => $handle, 'bytes' => 0, 'measured' => false];
         }
 
-        $result = $this->directorySize($path, $deadline);
+        $result = $measured[$path] ??= $this->directorySize($path, $deadline);
 
         return [
             'handle' => $handle,
@@ -145,6 +144,50 @@ class SystemReporter extends Component
             'files' => $result['files'],
             'measured' => $result['complete'],
         ];
+    }
+
+    /**
+     * Where one volume's files actually are.
+     *
+     * A Craft 5 volume is a filesystem *and a subpath within it*, and several volumes routinely share
+     * one filesystem — Craft has a validator dedicated to stopping their subpaths overlapping, which
+     * only makes sense because the arrangement is expected. Reading the filesystem's own root and
+     * stopping there is therefore wrong in the common case rather than the exotic one: every volume
+     * on a shared filesystem measured the same tree and reported byte-identical figures, and because
+     * the platform sums them for its total, a site with three such volumes read three times its real
+     * size. It looked plausible enough to survive, which is the worst kind of wrong number.
+     *
+     * Only volumes backed by the local filesystem can be walked at all. A remote adapter would mean
+     * an API call per directory to a third party, billed to the site, to satisfy a dashboard —
+     * reported as unmeasured instead, which is the honest answer.
+     *
+     * Both accessors are reached through method_exists rather than a type hint. The volume arrives
+     * here as mixed and stays that way on purpose: this plugin runs inside somebody else's Craft
+     * install, and a hard dependency on a class shape is how it would start failing on a version it
+     * could otherwise have tolerated.
+     */
+    private function volumePath(mixed $volume): ?string
+    {
+        return $this->safely(static function() use ($volume): ?string {
+            $fs = $volume->getFs();
+
+            // getRootPath() is Craft's own resolver: it parses the environment variable, normalises
+            // the separators and follows symlinks. The fallback does only the first of those, which
+            // is what this used to do for every volume.
+            $root = method_exists($fs, 'getRootPath')
+                ? $fs->getRootPath()
+                : (is_string($fs->path ?? null) && $fs->path !== '' ? Craft::parseEnv($fs->path) : null);
+
+            if (!is_string($root) || $root === '') {
+                return null;
+            }
+
+            $subpath = method_exists($volume, 'getSubpath')
+                ? trim((string) $volume->getSubpath(false), '/')
+                : '';
+
+            return $subpath === '' ? $root : rtrim($root, '/') . '/' . $subpath;
+        }, null);
     }
 
     /**

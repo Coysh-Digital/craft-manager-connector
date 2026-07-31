@@ -1,5 +1,56 @@
 # Changelog
 
+## 1.8.0
+
+Volumes are measured where their files actually are, and update reports say what changed.
+
+### Every volume reported the same size
+
+A Craft 5 volume is a filesystem *and a subpath within it*, and several volumes routinely share one
+filesystem — Craft has a validator whose only job is stopping their subpaths overlapping, which only
+makes sense because the arrangement is expected.
+
+`SystemReporter` read the filesystem's root and stopped there. So on a site with `images`, `invoices`
+and `logos` on one shared filesystem, all three walked the same tree and reported byte-identical
+sizes and file counts. Because the platform adds the volumes together for its "Craft holds" total,
+that site read three times its real size — a number plausible enough to go unquestioned, which is the
+worst kind of wrong.
+
+Volumes now resolve through Craft's own `getRootPath()` where it exists — which parses the
+environment variable, normalises separators and follows symlinks, rather than only the first of those
+— joined to the volume's own subpath. Directories already walked in a run are remembered, so a
+misconfiguration that made two volumes collide cannot spend the walk budget twice and leave the
+storage directory unmeasured.
+
+Nothing about the report's shape changed; `system.v1` is untouched. A site will simply see its
+volumes separate, and its total fall, on the next system report.
+
+### Release notes now cross the wire
+
+Requires `manager-protocol ^1.3` and sends `updates.v2`.
+
+Each plugin with an update available now carries the releases between the version it is running and
+the version it could run: the version, the note the plugin published, whether it was flagged
+critical, and the date. This is what makes Manager able to show "what changed between these versions"
+for a plugin, the way it already does for Craft itself.
+
+The previous version of this file said, in as many words, that forwarding release notes would put a
+description of an unpatched vulnerability attached to a named site into a dashboard. The half of that
+which is true is "attached to a named site". The notes themselves are public — the Craft Plugin Store
+hands them to anybody who asks — and this site already holds a copy, which is precisely why they can
+be sent **without the connector or the platform making a single request to anyone**. The alternative
+design, where the platform resolves plugin handles against the Plugin Store, would have told a third
+party which plugins every site in a fleet runs.
+
+What was never safe was the association, and that is a decision made at the receiving end.
+`updates.v2.json` states the obligation in its own description and the platform enforces it: notes are
+stored against a plugin and a version, never against a site.
+
+Bounded twice — ten releases per plugin, four thousand characters per note, and a budget across the
+whole report so a site with two hundred outdated plugins still produces something receivable. Notes
+are sent only for a plugin that has an update available; an up-to-date plugin is the same shape it
+was under v1.
+
 ## 1.7.1
 
 A capability that has not been granted is no longer an error.
