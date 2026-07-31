@@ -102,7 +102,7 @@ class ConnectorUtility extends Utility
             'settings' => $plugin->getSettings(),
             'connection' => $plugin->connection->current(),
             'connectorVersion' => Plugin::VERSION,
-            'securityUrl' => 'https://coysh.digital/manager/docs/security/',
+            'securityUrl' => 'https://managerforcraft.com/docs/security',
         ]);
     }
 }

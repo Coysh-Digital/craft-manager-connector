@@ -1,29 +1,26 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
-  <defs>
-    <!--
-      Ids are prefixed, not reused from the other plugins: the Plugin Store
-      lists several icons on one page, and duplicate gradient ids would have
-      each plugin painted in whichever one loaded last.
-    -->
-    <linearGradient id="mcBg" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#EE5836"/>
-      <stop offset="1" stop-color="#B4231A"/>
-    </linearGradient>
-    <linearGradient id="mcSheen" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#ffffff" stop-opacity="0.22"/>
-      <stop offset="0.55" stop-color="#ffffff" stop-opacity="0"/>
-    </linearGradient>
-  </defs>
-  <rect x="0" y="0" width="100" height="100" rx="24" fill="url(#mcBg)"/>
-  <rect x="0" y="0" width="100" height="100" rx="24" fill="url(#mcSheen)"/>
+  <!--
+    Flat fill, and a corner radius of a quarter of the side. Both are taken from
+    the favicon at https://managerforcraft.com/favicon.svg, which is a 32x32 with
+    rx="8" in #c9331c: same shape language, same red, scaled to this viewBox.
+
+    The gradient and the sheen this carried before are gone on purpose. The mark
+    they were approximating is flat, and at the size the Plugin Store actually
+    renders an icon a vertical gradient collapses into a muddy single colour
+    anyway. Removing them takes the <defs> block with it, and with it the
+    id-collision problem that block existed to work around: the Plugin Store lists
+    several icons on one page, and duplicate gradient ids had each plugin painted
+    in whichever one loaded last.
+  -->
+  <rect x="0" y="0" width="100" height="100" rx="25" fill="#c9331c"/>
   <!--
     One site reporting outbound to one platform. Deliberately not the fan-out
     the webhook notifier uses: this connector has a single destination, it is
     always the one that speaks first, and nothing ever comes back the other way.
     The arcs are concentric on the site, and that is what carries the direction:
     no arrowhead needed, and no fade either. Fading the outer arcs was tried and
-    dropped, because it lost too much contrast against the gradient and the other
-    plugins in this family all use a solid white glyph.
+    dropped, because it lost too much contrast and the other plugins in this
+    family all use a solid white glyph.
   -->
   <g fill="none" stroke="#ffffff" stroke-width="7" stroke-linecap="round">
     <path d="M32.2 54.4 A20 20 0 0 1 47.6 69.8"/>

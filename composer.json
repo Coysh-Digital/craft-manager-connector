@@ -16,7 +16,7 @@
         "email": "hello@coysh.digital",
         "issues": "https://github.com/Coysh-Digital/craft-manager-connector/issues",
         "source": "https://github.com/Coysh-Digital/craft-manager-connector",
-        "docs": "https://coysh.digital/manager/docs/connector/"
+        "docs": "https://managerforcraft.com/docs"
     },
     "authors": [
         {
@@ -44,7 +44,7 @@
         "handle": "manager-connector",
         "developer": "Coysh Digital",
         "developerUrl": "https://coysh.digital",
-        "documentationUrl": "https://coysh.digital/plugins/manager-connector/docs/",
+        "documentationUrl": "https://managerforcraft.com/docs",
         "changelogUrl": "https://raw.githubusercontent.com/Coysh-Digital/craft-manager-connector/main/CHANGELOG.md",
         "class": "coyshdigital\\managerconnector\\Plugin",
         "components": {
