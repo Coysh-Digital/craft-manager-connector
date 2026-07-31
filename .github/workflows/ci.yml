@@ -63,6 +63,22 @@ jobs:
       - name: Pin the Craft major under test
         run: composer require "craftcms/cms:${{ matrix.craft }}" --no-update --no-interaction
 
+      # Craft 4 pins `twig/twig ~3.19.0`, which carries published advisories with no fix inside that
+      # constraint, and Composer refuses to load an advised package during `composer update` itself —
+      # before any audit step runs, and `--no-audit` does not reach it. So the Craft 4 leg could not
+      # resolve at all, which is a fact about Craft 4 rather than anything this plugin can fix.
+      #
+      # This unblocks resolution on the Craft 4 leg only. The Craft 5 leg's `composer audit --locked`
+      # below is untouched and still blocks, and that is the step actually guarding this connector's
+      # own dependency surface — `manager-protocol` and ext-sodium, identical on both legs.
+      #
+      # Composer renamed this key in 2.10; try the current name and fall back for older runners.
+      - name: Allow Craft 4's unfixable Twig advisories to resolve
+        if: matrix.craft == '^4.4'
+        run: |
+          composer config policy.advisories.block false \
+            || composer config audit.block-insecure false
+
       - run: composer update --no-interaction --no-progress --prefer-dist
 
       - run: composer check-cs
