@@ -1,7 +1,7 @@
 # Manager Connector for Craft CMS
 
-Reports operational metadata from a Craft CMS 5 installation to a
-[Manager](https://managerforcraft.com) platform over signed, outbound-only requests.
+Reports operational metadata from a Craft CMS 5 installation to
+[Manager for Craft](https://managerforcraft.com) over signed, outbound-only requests.
 
 **MIT licensed.** This plugin is privileged code running inside your production website, so it is
 published in full, kept deliberately small, and licensed permissively: it sits in your codebase next
@@ -45,16 +45,16 @@ php craft manager-connector/preview
 
 ## Documentation
 
-Full documentation lives in the [`docs`](docs/) folder of this repository. This README is the short
-version; the docs go deeper on pairing, exactly what is
-and is not sent, what each capability permits, how backups work, the security
-model, the console commands, and troubleshooting.
+Full documentation is at [managerforcraft.com/docs](https://managerforcraft.com/docs); its source
+lives in the [`docs`](docs/) folder of this repository. This README is the short version. The docs
+go deeper on pairing, exactly what is and is not sent, what each capability permits, how backups
+work, the security model, the console commands, and troubleshooting.
 
 ## Requirements
 
 - Craft CMS 5.0 or later
 - PHP 8.2 or later
-- A Manager installation to report to, self-hosted or Manager Cloud
+- Manager Cloud or Manager Self-Hosted to report to
 
 ## Installation
 
