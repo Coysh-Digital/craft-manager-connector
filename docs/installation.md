@@ -5,10 +5,10 @@
 - Craft CMS 5.0 or later
 - PHP 8.2 or later
 - The `sodium` extension, which ships with PHP and is almost always already enabled
-- A Manager installation to report to
+- A Manager for Craft installation to report to
 
 That last one is either your own — [Manager Self-Hosted](https://github.com/Coysh-Digital/manager) is
-free and complete — or [Manager Cloud](https://coysh.digital/manager), which is the same core hosted by
+free and complete — or [Manager Cloud](https://managerforcraft.com), which is the same core hosted by
 Coysh Digital. This plugin is identical for both, so the choice is about who runs the server rather than
 what you get.
 
