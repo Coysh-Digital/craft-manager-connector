@@ -103,18 +103,6 @@ gets skipped.
 
 ## Verifying a release
 
-Tags are signed. To check one:
-
-```bash
-git clone https://github.com/Coysh-Digital/craft-manager-connector.git
-cd craft-manager-connector
-git config gpg.ssh.allowedSignersFile .github/allowed_signers
-git tag -v v1.4.0
-```
-
-Expect `Good "git" signature`. Cross-check the key against
-[github.com/timcoysh.keys](https://github.com/timcoysh.keys), which is served from outside this
-repository — `.github/allowed_signers` lives in the repository it vouches for, so on its own it is
-trust-on-first-use.
-
-Installing through Composer, Composer verifies the package hash against Packagist for you.
+Tags are no longer signed, and there is no published signer list to check one against. Installing
+through Composer, Composer verifies the package hash against Packagist for you, which establishes
+that you received what Packagist holds. It does not establish who published it.
