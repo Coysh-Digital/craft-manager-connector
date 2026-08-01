@@ -124,7 +124,38 @@
                 <tr>
                     <th scope="row">{{ "Backups"|t('manager-connector') }}</th>
                     <td>
-                        {% if connection.platformBackupPublicKey %}
+                        {#
+                            Which format this site is on decides what "no key" means.
+
+                            Under v2 the platform's own artifact key is discarded on purpose — see
+                            Connection::raiseFormatFloor, which nulls it the moment the floor is
+                            raised. Reading platformBackupPublicKey alone therefore reported a
+                            correctly configured zero-knowledge site as broken, permanently, on the
+                            one screen an operator checks to find out whether backups work.
+                        #}
+                        {% if connection.backupFormatFloor == 'v2' %}
+                            <p>
+                                {{ "This site may be asked to take a database backup. Each one is encrypted here and sealed to this organisation's own recovery keys — the platform holds no key that can open them."|t('manager-connector') }}
+                            </p>
+
+                            {#
+                                Which keys this site will accept is deliberately not reported here.
+
+                                Invariant 8 forbids this template from touching the pinning settings at
+                                all, and the reason is worth restating rather than working around: a
+                                hijacked control-panel session that could re-pin this site would defeat
+                                the only control that makes the sentence above mean anything. The check
+                                matches on the setting names, so a pre-computed count passed under a
+                                different name would slip past it — which is the back door the invariant
+                                exists to keep shut, and not a decision to take while fixing a display bug.
+
+                                An operator who wants to know reads config/manager-connector.php, which is
+                                in their own version control and is the authority either way.
+                            #}
+                            <p class="light">
+                                {{ "The plaintext dump is deleted as soon as it has been encrypted. Backups are uploaded to the platform this site is paired with and nowhere else; no instruction from the platform can change where they go."|t('manager-connector') }}
+                            </p>
+                        {% elseif connection.platformBackupPublicKey %}
                             <p>
                                 {{ "This site may be asked to take a database backup. Each one is encrypted here, with a key generated on this server and sealed to the platform, before it is uploaded."|t('manager-connector') }}
                             </p>
@@ -132,10 +163,14 @@
                                 {{ "The plaintext dump is deleted as soon as it has been encrypted. Backups are uploaded to the platform this site is paired with and nowhere else; no instruction from the platform can change where they go."|t('manager-connector') }}
                             </p>
                         {% else %}
-                            {# Permission without a key means no backup will be attempted. Said plainly,
-                               because the alternative is an operator wondering why nothing happens. #}
+                            {# Permission without a key, on a site still using the format that needs one.
+                               Said plainly, because the alternative is an operator wondering why
+                               nothing happens. #}
                             <p class="error">
                                 {{ "Permission has been granted, but the platform has not published an artifact encryption key. No backup will be taken until it does — an unencrypted database will never be uploaded."|t('manager-connector') }}
+                            </p>
+                            <p class="light">
+                                {{ "Setting up a recovery key in Manager also resolves this: it moves this organisation to backups sealed to its own keys, which need no key from the platform at all."|t('manager-connector') }}
                             </p>
                         {% endif %}
                     </td>
