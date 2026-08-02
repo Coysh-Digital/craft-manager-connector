@@ -87,6 +87,21 @@ is never granted at pairing and needs its own confirmation.
 `config/manager-connector.php`, having first checked the size is what you expect. The limit exists so an
 unexpectedly large dump fails early rather than filling the disk.
 
+**"the database is larger than the platform will accept."** A different limit from the one above, and
+not one you can change here — it belongs to the Manager installation you report to. Self-hosted, raise
+`MANAGER_BACKUP_MAX_BYTES` there; the refusal names the current ceiling. On Manager Cloud the storage
+is metered and billed rather than capped, so this should not appear.
+
+**"there is not enough free disk to take a backup safely."** A backup holds the dump and the encrypted
+copy at once, so it needs about twice the dump. The message gives both numbers. Free space, or move
+Craft's backup directory to a volume that has it — the check runs before anything is written, so
+nothing has been left behind.
+
+**"part N of M could not be uploaded."** Only on sites using a direct upload host, and only for
+artifacts large enough to be sent in parts. Each part is retried three times on its own before the
+backup fails, so a single dropped connection does not cost the whole upload. Persistent failures are
+usually a proxy with its own body-size limit between the site and storage.
+
 **"the database backup did not complete."** Craft's own backup failed. Try `php craft db/backup` directly
 — if that fails too, the problem is the database or the disk, not this plugin.
 

@@ -86,6 +86,30 @@ class JobRunner extends Component
             ? array_values(array_filter($backup['recipients'], 'is_array'))
             : [];
 
+        /*
+         | Which declaration schemas this platform accepts, most preferred first.
+         |
+         | Absent means a platform older than backup.v3, and the connector falls back to v2 — which is
+         | the whole reason this is advertised rather than assumed. A connector that simply started
+         | sending v3 would break against every platform in the field until each one upgraded, and the
+         | thing it would break is backups.
+         |
+         | Read here rather than from a job's parameters deliberately. Which formats a platform can
+         | read is a property of the platform, not of one job: a job claimed before an upgrade and run
+         | after it would otherwise instruct a format that is no longer the right answer. A size may
+         | travel in a job payload because a size can only ever cause less work; a schema version
+         | selects a code path.
+         */
+        $declarations = is_array($backup['declarations'] ?? null)
+            ? array_values(array_filter($backup['declarations'], 'is_string'))
+            : [];
+
+        // What this platform will accept, so a site with a large database can be refused before it
+        // dumps rather than after. A ceiling, never a destination.
+        $maxArtifactBytes = isset($backup['max_artifact_bytes']) && is_int($backup['max_artifact_bytes'])
+            ? $backup['max_artifact_bytes']
+            : null;
+
         /** @var list<array<string, mixed>> $jobs */
         $jobs = $response['jobs'] ?? [];
 
@@ -115,7 +139,7 @@ class JobRunner extends Component
             }
 
             try {
-                $result = $this->handle($type, $id, $job['parameters'] ?? [], $recipients, $format);
+                $result = $this->handle($type, $id, $job['parameters'] ?? [], $recipients, $format, $declarations, $maxArtifactBytes);
 
                 $this->report($id, true, $result);
                 $tally['succeeded']++;
@@ -156,10 +180,18 @@ class JobRunner extends Component
      *
      * @param  array<string, mixed>  $parameters
      * @param  list<array<string, mixed>>  $recipients
+     * @param  list<string>  $declarations  schemas the platform accepts, most preferred first
      * @return array<string, mixed>
      */
-    private function handle(string $type, string $jobId, array $parameters, array $recipients = [], string $format = Protocol::BACKUP_FORMAT_V1): array
-    {
+    private function handle(
+        string $type,
+        string $jobId,
+        array $parameters,
+        array $recipients = [],
+        string $format = Protocol::BACKUP_FORMAT_V1,
+        array $declarations = [],
+        ?int $maxArtifactBytes = null,
+    ): array {
         return match ($type) {
             Jobs::INVENTORY_REFRESH => $this->refreshInventory(),
             Jobs::UPDATES_CHECK => $this->checkUpdates($parameters),
@@ -182,6 +214,8 @@ class JobRunner extends Component
                 $recipients,
                 $format,
                 isset($parameters['max_megabytes']) ? (int) $parameters['max_megabytes'] : null,
+                $declarations,
+                $maxArtifactBytes,
             ),
             // Unreachable: canHandle() gates this. Present so adding a constant without a handler
             // fails loudly rather than silently doing nothing.

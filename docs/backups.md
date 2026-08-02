@@ -108,7 +108,27 @@ Two of them:
   lives on your server and most sites have no config file at all, so the default was acting as a
   ceiling that had never been picked. Reporting to your own Manager, the reasoning reverses and the
   setting stands: whoever sets it also owns the disk the dump lands on.
-- The platform's own ceiling, which it applies before reading the upload.
+- The platform's own ceiling, which it applies before reading the upload. From connector 1.11.0 the
+  platform advertises that number on the signed claim response, so a database larger than it will fail
+  **before** the dump is taken rather than after it has been dumped, encrypted and offered. The
+  message names both sizes.
+
+There is no longer a third limit. Until `manager-protocol` 1.5.0 the wire contract itself refused any
+artifact over 2 GB, which is not something an operator or a hosted platform could raise, and it was
+refusing real backups on sites whose databases had simply grown.
+
+## Free disk
+
+A backup needs roughly **twice the dump** on disk at its peak: the dump itself, then the encrypted
+stream and the assembled artifact alongside each other while the envelope is written. The plugin
+checks before it starts, sized against the last dump it took, and refuses with both numbers in the
+message rather than filling the volume.
+
+The plaintext dump is removed as soon as encryption finishes rather than at the end of the upload, so
+it exists for minutes rather than hours and does not occupy the disk while a large artifact uploads.
+
+On a first run there is no history to size against, so the check passes and the ordinary failure path
+stands.
 
 ## The destination cannot be changed
 

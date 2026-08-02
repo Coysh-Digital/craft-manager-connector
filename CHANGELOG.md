@@ -1,5 +1,68 @@
 # Changelog
 
+## 1.11.0
+
+Backs up a database larger than two gigabytes. Requires `manager-protocol ^1.5`.
+
+### What was wrong
+
+`backup.v2` wrote a 2 GB ceiling into the wire contract itself, where neither an operator nor a
+hosted platform could raise it. A site whose database had grown past it dumped, encrypted and offered
+twenty gigabytes every night and was refused at the last step, having done all of the work and kept
+none of it.
+
+`manager-protocol` 1.5.0 adds `backup.v3`, which carries no ceiling. What a platform accepts is now
+that platform's configuration.
+
+### Declaring v3
+
+The platform advertises which declaration schemas it accepts on the signed claim response. This
+connector sends the newest it recognises, and falls back to `backup.v2` when the key is absent — which
+is what every platform older than this says. **No cutover, and no fleet upgrade in step:** an old
+connector against a new platform keeps working, and a new connector against an old platform keeps
+working.
+
+This is deliberately *not* tied to the backup format floor. That floor is a one-way commitment about
+who can read a backup; how large an artifact may be is a different question, and running the two
+together would have made lifting a size ceiling irreversible.
+
+### Uploading in parts
+
+An object store refuses a single request over five gigabytes, so a large artifact now uploads as a
+sequence of presigned parts when the platform issues them. Each part carries a bounded slice streamed
+from disk, so nothing is held in memory, and a failed part is retried on its own — one dropped
+connection near the end of a twenty-gigabyte upload no longer costs the whole thing.
+
+Nothing about what this plugin may be told has changed. A part carries a path and headers, never a
+host; the URL is still assembled in exactly one place from `backupUploadHost` in your own config file;
+and the build check that refuses a destination read from anything the platform sends is untouched.
+
+The declaration now carries `artifact_crc32c` beside `artifact_sha256`, because a store can only
+confirm a whole-object checksum across an assembly when the algorithm linearises. Both are computed in
+a single pass over the finished file rather than two.
+
+### Failing before the work, not after
+
+- **The platform's ceiling is checked before the dump.** It arrives on the claim response, so a
+  database too large is refused before anything is written, with both sizes in the message.
+- **Free disk is checked before the dump.** A backup needs about twice the dump at its peak, sized
+  against the last one this site took. Filling a production disk is a worse outcome than not taking a
+  backup, and it is one that can be seen coming. With no history it does not guess.
+- **The plaintext dump is destroyed as soon as encryption finishes**, rather than when the upload
+  ends. It is the most dangerous file that will ever exist on the server, and it now lives for minutes
+  instead of hours. It also drops the peak disk requirement from three times the dump to two.
+
+### Settings
+
+- `uploadTimeout` may now be set up to 24 hours. The default is unchanged at 900 seconds.
+- `maxBackupMegabytes` may now be set up to 1 TB. The default is unchanged at 2048. The old 10 GB
+  validation ceiling was its own quiet trap — a value could be configured that the wire contract would
+  then refuse, discovered only after a dump had been taken.
+- The queue job now reserves itself for `uploadTimeout` plus thirty minutes rather than the queue's
+  five-minute default. A backup running longer than its reservation was not cancelled by the queue; it
+  had a **second copy started alongside it**, on a server already writing a copy of its own database.
+  It does not retry automatically, which is the behaviour it already had.
+
 ## 1.10.2
 
 The backups panel no longer claims backups are blocked when they are not.
