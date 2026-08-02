@@ -1,5 +1,31 @@
 # Changelog
 
+## 1.10.0
+
+A platform that stores and meters the artifact may now lift this site's backup size limit.
+
+### `maxBackupMegabytes` is self-hosted only
+
+`backup.create` may carry `max_megabytes`, and zero means no limit. When it is absent — which is
+every self-hosted Manager — the site's own `maxBackupMegabytes` stands exactly as before, and
+nothing about this release changes what those installations do.
+
+The setting bounds a dump written to this site's disk, and self-hosted that is the right control in
+the right place: whoever sets it owns the disk. Reporting to Manager Cloud it is neither. The
+storage is the platform's, already metered and billed, and this config file lives on your own
+server — most sites have no config file at all, so a 2 GB default nobody chose was refusing backups
+of space already being paid for.
+
+**Only ever a size.** The destination and the recipient list are unchanged and still come from local
+configuration alone. A size can only permit less work than this site would already do, or lift a
+limit on a platform that has taken responsibility for holding the result; it cannot redirect a
+backup or widen who is able to open one. `bin/verify-invariants.php` is untouched and still fails
+the build on any url, endpoint or destination read from job parameters.
+
+`docs/backups.md` said the job "carries no parameters at all". That is no longer true, and it is the
+page explaining what the platform can and cannot influence, so it now states what may be carried and
+why a size is a different kind of thing from a destination.
+
 ## 1.9.1
 
 A fresh install could not read `backupFormatFloor`, and the plugin now points at managerforcraft.com.
