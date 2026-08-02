@@ -2,8 +2,9 @@
 
 ## Requirements
 
-- Craft CMS 5.0 or later
-- PHP 8.2 or later
+- Craft CMS 4.4 or later, or Craft CMS 5.0 or later
+- PHP 8.1 or later
+  (Craft 4 itself runs on 8.0.2+, but this plugin does not — see the changelog for why)
 - The `sodium` extension, which ships with PHP and is almost always already enabled
 - A Manager for Craft installation to report to
 

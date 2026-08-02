@@ -1,6 +1,6 @@
 # Manager Connector for Craft CMS
 
-Reports operational metadata from a Craft CMS 5 installation to
+Reports operational metadata from a Craft CMS 4 or 5 installation to
 [Manager for Craft](https://managerforcraft.com) over signed, outbound-only requests.
 
 **MIT licensed.** This plugin is privileged code running inside your production website, so it is
