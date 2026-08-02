@@ -164,10 +164,25 @@ class JobRunner extends Component
             Jobs::INVENTORY_REFRESH => $this->refreshInventory(),
             Jobs::UPDATES_CHECK => $this->checkUpdates($parameters),
 
-            // The job identifier and the recipient list, never a destination. Where the artifact goes
-            // still comes from the connection record and nowhere else; who can open it is checked
-            // against this site's own pinned fingerprints before anything is dumped.
-            Jobs::BACKUP_CREATE => Plugin::getInstance()->backups->run($jobId, $recipients, $format),
+            /*
+             | The job identifier, the recipient list, and a size ceiling. Never a destination.
+             |
+             | Where the artifact goes still comes from the connection record and nowhere else; who
+             | can open it is checked against this site's own pinned fingerprints before anything is
+             | dumped. Those are the two the platform may not influence, and a build check enforces
+             | both by refusing any read of a url, endpoint or destination from here.
+             |
+             | A size ceiling is a different kind of thing: it can only ever permit less work than
+             | this site would otherwise do, or lift a limit on a platform that has taken
+             | responsibility for storing the result. It cannot redirect a backup or widen who can
+             | read one.
+             */
+            Jobs::BACKUP_CREATE => Plugin::getInstance()->backups->run(
+                $jobId,
+                $recipients,
+                $format,
+                isset($parameters['max_megabytes']) ? (int) $parameters['max_megabytes'] : null,
+            ),
             // Unreachable: canHandle() gates this. Present so adding a constant without a handler
             // fails loudly rather than silently doing nothing.
             default => throw new \LogicException("No handler for '{$type}'."),

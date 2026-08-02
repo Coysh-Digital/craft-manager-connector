@@ -101,12 +101,24 @@ Two of them:
 - `maxBackupMegabytes` in this plugin's settings, default 2048. A safety valve rather than a policy:
   dumping a database far larger than expected is how a backup job fills a production disk, and failing
   early with a clear message beats failing late with a full volume.
+
+  **Self-hosted only. Manager Cloud ignores it.** A platform that stores and meters the artifact may
+  lift this limit, and Cloud does — the storage is its own, already metered and billed, so a database
+  that has grown past a number nobody chose is a thing to charge for rather than refuse. This file
+  lives on your server and most sites have no config file at all, so the default was acting as a
+  ceiling that had never been picked. Reporting to your own Manager, the reasoning reverses and the
+  setting stands: whoever sets it also owns the disk the dump lands on.
 - The platform's own ceiling, which it applies before reading the upload.
 
 ## The destination cannot be changed
 
-The `backup.create` job carries **no parameters at all**. In particular it carries nothing naming where
-the artifact should go.
+The `backup.create` job carries **nothing naming where the artifact should go**. It may carry one
+thing: `max_megabytes`, a size ceiling, sent only by a platform that stores and meters the result.
+
+That distinction is the point rather than a hedge. A size can only permit less work than this site
+would otherwise do, or lift a limit on a platform that has taken responsibility for holding the
+result. It cannot redirect a backup or widen who is able to read one, which is what the two
+restrictions below are protecting.
 
 The upload goes to the platform URL stored at pairing. When direct-to-storage uploads are configured,
 Manager supplies a path and a query string and **never a host** — the URL is built from
