@@ -148,8 +148,9 @@ class Client extends Component
 
         if ($response['status'] >= 400) {
             throw new RuntimeException(sprintf(
-                'The platform rejected the request (HTTP %d). Correlation ID: %s',
+                'The platform rejected the request (HTTP %d).%s Correlation ID: %s',
                 $response['status'],
+                $this->reasonFrom($decoded),
                 $this->correlationFrom($decoded, $response['headers']),
             ));
         }
@@ -392,8 +393,9 @@ class Client extends Component
 
         if ($response->getStatusCode() >= 400) {
             throw new RuntimeException(sprintf(
-                'The platform rejected the artifact (HTTP %d). Correlation ID: %s',
+                'The platform rejected the artifact (HTTP %d).%s Correlation ID: %s',
                 $response->getStatusCode(),
+                $this->reasonFrom($decoded),
                 $this->correlationFrom($decoded, $response->getHeaders()),
             ));
         }
@@ -490,6 +492,26 @@ class Client extends Component
      * @param  array<string, mixed>  $decoded
      * @param  array<string, list<string>>  $headers
      */
+    /**
+     * Why the platform refused, when it said.
+     *
+     * The rejection body carries a `reason`, and this used to throw it away — reporting a bare
+     * status and a correlation identifier instead. That identifier is not always written down on the
+     * platform side, so the one line a person had to go on named a record that did not exist, while
+     * the actual explanation had arrived in the same response and been discarded.
+     *
+     * Safe to print. These are fixed messages the platform composes about its own refusal — a quota,
+     * an unrecognised format, a limit — never anything a site reported about its contents.
+     *
+     * @param  array<string, mixed>  $decoded
+     */
+    private function reasonFrom(array $decoded): string
+    {
+        $reason = $decoded['reason'] ?? $decoded['error'] ?? null;
+
+        return is_string($reason) && $reason !== '' ? ' ' . rtrim($reason, '.') . '.' : '';
+    }
+
     private function correlationFrom(array $decoded, array $headers): string
     {
         $fromBody = $decoded['correlation_id'] ?? null;

@@ -1,5 +1,23 @@
 # Changelog
 
+## 1.10.1
+
+A refused backup now says why.
+
+### The platform's reason was arriving and being thrown away
+
+A rejection body carries a `reason`, and `Client` reported only the status and a correlation
+identifier — decoding the body to find the identifier and discarding the explanation sitting beside
+it. So a failed backup read as `The platform rejected the request (HTTP 422)` and pointed at an id
+which, on the platform side, was not always written down. The explanation had already arrived in the
+same response.
+
+Both rejection paths now include it, so the message names the cause: a quota, an unrecognised
+format, a limit.
+
+Safe to print, and only because of what these strings are: fixed messages the platform composes
+about its own refusal, never anything a site reported about its own contents.
+
 ## 1.10.0
 
 A platform that stores and meters the artifact may now lift this site's backup size limit.
