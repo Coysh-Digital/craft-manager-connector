@@ -1,5 +1,24 @@
 # Changelog
 
+## 1.10.2
+
+The backups panel no longer claims backups are blocked when they are not.
+
+### A correctly configured site was told its backups would not run
+
+The panel read the backup format floor, and that floor is a ratchet raised only *after* a v2 backup
+succeeds. So every site reads `v1` until its first one lands — including an organisation using
+recovery keys, whose platform has therefore never published an artifact key of its own, because
+under v2 it does not need one.
+
+The screen then stated, flatly, that no backup would be taken. Two live sites were told that while
+the platform was asking them for v2 and the real fault was elsewhere. That is worse than saying
+nothing: it sends somebody to fix a configuration that is already correct.
+
+It now describes what is known rather than predicting what will happen — this site cannot tell which
+format it will be asked for until it is asked — and still says plainly that an organisation with no
+recovery key and no platform key cannot have a backup taken.
+
 ## 1.10.1
 
 A refused backup now says why.
