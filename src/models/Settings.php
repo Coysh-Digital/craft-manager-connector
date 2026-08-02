@@ -74,6 +74,16 @@ class Settings extends Model
      * A safety valve rather than a policy. Dumping a database far larger than expected is how a backup
      * job fills a disk on a production site, and failing early with a clear message beats failing late
      * with a full volume.
+     *
+     * **This applies to a self-hosted Manager and is ignored by Manager Cloud.** A platform that
+     * stores and meters the artifact may lift it, and Cloud does: the storage is its own, it is
+     * already metered and billed, and a customer whose database has grown past a number they never
+     * chose should be charged for the space rather than refused the backup. This file lives on the
+     * customer's own server, most sites do not have one at all, and so the default here was acting
+     * as a ceiling nobody had picked.
+     *
+     * Self-hosted the reasoning is reversed and the setting stands: the operator who sets it also
+     * owns the disk the dump lands on.
      */
     public int $maxBackupMegabytes = 2048;
 

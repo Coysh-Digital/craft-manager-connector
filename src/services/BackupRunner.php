@@ -53,7 +53,7 @@ class BackupRunner extends Component
      * @param  list<array<string, mixed>>  $offeredRecipients  from a signature-verified claim response
      * @return array<string, mixed> the job result
      */
-    public function run(string $jobId, array $offeredRecipients = [], string $format = Protocol::BACKUP_FORMAT_V1): array
+    public function run(string $jobId, array $offeredRecipients = [], string $format = Protocol::BACKUP_FORMAT_V1, ?int $platformMaxMegabytes = null): array
     {
         $plugin = Plugin::getInstance();
 
@@ -106,7 +106,7 @@ class BackupRunner extends Component
         $encrypted = null;
 
         try {
-            $dump = $this->takeDump();
+            $dump = $this->takeDump($platformMaxMegabytes);
 
             $encrypted = $useV2
                 ? $this->encryptToRecipients($dump, $jobId, $recipients)
@@ -424,7 +424,7 @@ class BackupRunner extends Component
      *
      * @return array{path: string, taken_at: int, engine: string, engine_version: string, compressed: bool}
      */
-    private function takeDump(): array
+    private function takeDump(?int $platformMaxMegabytes = null): array
     {
         $takenAt = time();
 
@@ -449,9 +449,25 @@ class BackupRunner extends Component
             throw new RuntimeException('the database backup was empty');
         }
 
-        $limit = Plugin::getInstance()->getSettings()->maxBackupMegabytes * 1024 * 1024;
+        /*
+         | Whose limit applies.
+         |
+         | `maxBackupMegabytes` is a safety valve for this machine: it bounds a dump written to this
+         | site's own disk, and self-hosted the operator who set it also owns the disk. That is the
+         | default and it stands unless the platform says otherwise.
+         |
+         | A platform that stores and meters the artifact may override it, and zero means no limit at
+         | all. That is Manager Cloud: the config file this setting lives in is on the customer's own
+         | server, most sites do not have one, and so a default nobody chose was refusing backups of
+         | storage already being paid for.
+         |
+         | Only ever a size. A build check refuses any url, endpoint or destination read from job
+         | parameters, and this changes nothing about where the artifact goes or who can open it.
+         */
+        $megabytes = $platformMaxMegabytes ?? Plugin::getInstance()->getSettings()->maxBackupMegabytes;
+        $limit = $megabytes * 1024 * 1024;
 
-        if ($bytes > $limit) {
+        if ($limit > 0 && $bytes > $limit) {
             $this->shred($path);
 
             throw new RuntimeException('the database is larger than this connector is configured to back up');
