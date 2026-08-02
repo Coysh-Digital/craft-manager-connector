@@ -163,14 +163,30 @@
                                 {{ "The plaintext dump is deleted as soon as it has been encrypted. Backups are uploaded to the platform this site is paired with and nowhere else; no instruction from the platform can change where they go."|t('manager-connector') }}
                             </p>
                         {% else %}
-                            {# Permission without a key, on a site still using the format that needs one.
-                               Said plainly, because the alternative is an operator wondering why
-                               nothing happens. #}
-                            <p class="error">
-                                {{ "Permission has been granted, but the platform has not published an artifact encryption key. No backup will be taken until it does — an unencrypted database will never be uploaded."|t('manager-connector') }}
+                            {#
+                                Permission, no platform key, and no v2 backup completed yet.
+
+                                This used to say "No backup will be taken until it does", as a flat
+                                statement of fact. It is not one. The floor is a ratchet raised only
+                                *after* a v2 backup succeeds, so every site reads v1 until its first
+                                one lands — including a correctly configured organisation whose
+                                platform holds recovery keys and has therefore never published an
+                                artifact key of its own, because under v2 it does not need one.
+
+                                So the screen told two live sites their backups were blocked while
+                                the platform was asking them for v2 and the real fault was elsewhere,
+                                which is worse than saying nothing: it sends somebody to fix a
+                                configuration that is already correct.
+
+                                It now describes what is known rather than predicting what will
+                                happen. The distinction is the whole point — this site cannot tell
+                                which format it will be asked for until it is asked.
+                            #}
+                            <p class="light">
+                                {{ "This platform has published no artifact encryption key of its own. That is expected when your organisation uses recovery keys: backups are sealed to those instead, and this site will report which was used after its next backup."|t('manager-connector') }}
                             </p>
                             <p class="light">
-                                {{ "Setting up a recovery key in Manager also resolves this: it moves this organisation to backups sealed to its own keys, which need no key from the platform at all."|t('manager-connector') }}
+                                {{ "If your organisation has no recovery key either, no backup can be taken — an unencrypted database will never be uploaded. Create one in Manager to resolve it."|t('manager-connector') }}
                             </p>
                         {% endif %}
                     </td>
