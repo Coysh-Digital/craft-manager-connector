@@ -89,8 +89,22 @@ unexpectedly large dump fails early rather than filling the disk.
 
 **"the database is larger than the platform will accept."** A different limit from the one above, and
 not one you can change here — it belongs to the Manager installation you report to. Self-hosted, raise
-`MANAGER_BACKUP_MAX_BYTES` there; the refusal names the current ceiling. On Manager Cloud the storage
-is metered and billed rather than capped, so this should not appear.
+`MANAGER_BACKUP_MAX_BYTES` there, or unset it for no ceiling; the refusal names the current one. On
+Manager Cloud the storage is metered and billed rather than capped, so this should not appear.
+
+**"The platform rejected the artifact (HTTP 413)."** Which of the two messages follows matters, and
+they point in opposite directions.
+
+If it names a correlation ID, Manager refused it and wrote a line you can look up. Give that ID to
+whoever runs the platform.
+
+If instead it says *no correlation ID was returned and the response was not JSON*, the request never
+reached Manager. A proxy or web server in front of it — nginx, Cloudflare, a load balancer — answered
+with its own error page first, so there is nothing in the platform's log to find and the platform's
+own size ceiling is not the cause. The fix is on the platform host: `client_max_body_size` in nginx
+(**the default is 1 MB**, which rejects essentially every real backup) and `post_max_size` in PHP.
+A live console ran at `client_max_body_size 2m` and refused a 2.1 MB database nightly for four
+nights before anyone looked past the ceiling.
 
 **"there is not enough free disk to take a backup safely."** A backup holds the dump and the encrypted
 copy at once, so it needs about twice the dump. The message gives both numbers. Free space, or move

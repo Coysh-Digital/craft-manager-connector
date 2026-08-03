@@ -71,8 +71,8 @@ class Client extends Component
 
         if ($response['status'] !== 200) {
             throw new RuntimeException(
-                'Pairing was refused by the platform. Correlation ID: '
-                . $this->correlationFrom($decoded, $response['headers'])
+                'Pairing was refused by the platform.'
+                . $this->attribution($response['body'], $decoded, $response['headers'])
             );
         }
 
@@ -152,10 +152,10 @@ class Client extends Component
 
         if ($response['status'] >= 400) {
             throw new RuntimeException(sprintf(
-                'The platform rejected the request (HTTP %d).%s Correlation ID: %s',
+                'The platform rejected the request (HTTP %d).%s%s',
                 $response['status'],
                 $this->reasonFrom($decoded),
-                $this->correlationFrom($decoded, $response['headers']),
+                $this->attribution($response['body'], $decoded, $response['headers']),
             ));
         }
 
@@ -479,14 +479,17 @@ class Client extends Component
             }
         }
 
-        $decoded = $this->decode((string) $response->getBody());
+        // Read once. The stream is consumed, so asking for it again returns nothing — and the raw
+        // body is what tells a platform rejection apart from a proxy's error page.
+        $raw = (string) $response->getBody();
+        $decoded = $this->decode($raw);
 
         if ($response->getStatusCode() >= 400) {
             throw new RuntimeException(sprintf(
-                'The platform rejected the artifact (HTTP %d).%s Correlation ID: %s',
+                'The platform rejected the artifact (HTTP %d).%s%s',
                 $response->getStatusCode(),
                 $this->reasonFrom($decoded),
-                $this->correlationFrom($decoded, $response->getHeaders()),
+                $this->attribution($raw, $decoded, $response->getHeaders()),
             ));
         }
 
@@ -600,6 +603,51 @@ class Client extends Component
         $reason = $decoded['reason'] ?? $decoded['error'] ?? null;
 
         return is_string($reason) && $reason !== '' ? ' ' . rtrim($reason, '.') . '.' : '';
+    }
+
+    /**
+     * What to say about *who* refused, which is not always the platform.
+     *
+     * Every rejection the platform composes carries a correlation identifier, in the body and in
+     * the `Manager-Correlation-Id` header, and writes a matching line to its own log. Even an
+     * unhandled 500 does, since the platform decorates the responses it never planned for. So an
+     * error with no identifier at all and a body that is not JSON did not come from the platform:
+     * something in front of it answered first, and nothing about it will be in the platform's log.
+     *
+     * That distinction cost four nights on a live site. A backup failed nightly with
+     *
+     *     The platform rejected the artifact (HTTP 413). Correlation ID: unknown
+     *
+     * and the message sent everybody to the platform — to its size ceiling, its configuration, its
+     * log — when nginx in front of it was refusing a 2.1 MB body at `client_max_body_size 2m` and
+     * the request had never reached PHP at all. The one clue that would have said so was in the
+     * response the whole time: no identifier, and an HTML error page where JSON should have been.
+     *
+     * `unknown` is kept for the case it actually describes — the platform answered, in JSON, and
+     * chose not to include one. Merging the two would trade a message that is unhelpful for a
+     * message that is wrong.
+     *
+     * @param  array<string, mixed>  $decoded
+     * @param  array<string, list<string>>  $headers
+     */
+    private function attribution(string $body, array $decoded, array $headers): string
+    {
+        $correlationId = $this->correlationFrom($decoded, $headers);
+
+        if ($correlationId !== 'unknown') {
+            return ' Correlation ID: ' . $correlationId;
+        }
+
+        // The same test decode() applies, asked about the raw body rather than its result: anything
+        // that is not a JSON object is not something this platform composed.
+        if (!is_array(json_decode($body, true))) {
+            return ' No correlation ID was returned and the response was not JSON, so a proxy or web '
+                . 'server in front of the platform refused this before it reached the application — '
+                . 'check the upload body size limit on the platform host. Nothing about this will '
+                . 'appear in the platform log.';
+        }
+
+        return ' Correlation ID: unknown';
     }
 
     private function correlationFrom(array $decoded, array $headers): string
