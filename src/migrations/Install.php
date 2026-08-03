@@ -57,6 +57,11 @@ class Install extends Migration
             // upgraded into it — it has to be created here as well.
             'backupFormatFloor' => $this->string(8)->notNull()->defaultValue('v1'),
 
+            // Which runtime-report schema the platform understands, learned from its own replies and
+            // defaulting to the oldest. Same reason as the line above for existing here as well as
+            // in its own migration.
+            'systemReportSchema' => $this->string(32)->notNull()->defaultValue('system.v1'),
+
             'capabilities' => $this->text(),
             'state' => $this->string(32)->notNull()->defaultValue(ConnectionRecord::STATE_ACTIVE),
             'pairedAt' => $this->dateTime(),

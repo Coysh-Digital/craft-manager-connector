@@ -1,5 +1,54 @@
 # Changelog
 
+## 1.12.0
+
+Reports where each asset volume actually is, and why one could not be measured. Requires
+`manager-protocol ^1.6`.
+
+### What was wrong
+
+`measured: false` meant three unrelated things: the volume is on remote storage; the walk ran out of
+`storageWalkSeconds`; or the path resolved to nothing this process could open. Manager showed all
+three as one grey "Not measured" badge, and they want three different responses — nothing at all, a
+larger budget, and somebody fixing a configuration.
+
+Nothing said which volumes were remote either, so Manager could not say that a volume on S3
+contributes none of its bytes to the disk figures beside it.
+
+### What changed
+
+- **`location`** — `local` or `remote`, per volume. Determined from Craft's own local filesystem
+  class *and* from whether a root path resolves, and omitted rather than guessed when neither
+  answers. A confident "remote" against a local volume would claim the bytes are not on a disk they
+  are on.
+- **`unmeasured_reason`** — `remote`, `timeout` or `unreadable`.
+- A walk that runs out of budget now keeps the bytes it reached and says the figure is a floor,
+  rather than reporting nothing.
+
+### The version is the platform's choice, not this plugin's
+
+This connector sends `system.v1` until the platform tells it, in a reply, that it accepts something
+newer. That answer is stored on the connection record and can move in **both** directions, unlike
+`backupFormatFloor` beside it: a format floor is a security commitment this site makes about itself
+and no response may lower, while this is a fact about somebody else's software, and a platform can be
+rolled back or a site pointed at a different one.
+
+The alternative was a flag day. The two sides are upgraded by different people on different days —
+whoever runs the platform upgrades it, each site upgrades its own plugin — and `system.v1` sets
+`additionalProperties: false`, so a v2 report reaching a v1 platform is refused **whole**. A runtime
+report is fire-and-forget, so the only symptom would have been a Health screen that quietly stopped
+moving.
+
+The cost is one reporting cycle: the answer arrives in the reply to a report, so the next run is the
+first that can act on it.
+
+### What was deliberately left out
+
+The adapter's name, the bucket, the region and the endpoint. `location` has two values because what
+a screen needs to know is whether the bytes count towards a disk; a provider name invites a bucket
+beside it, and a bucket names somebody's infrastructure. `manager-protocol` 1.6.0 carries a must-fail
+fixture for exactly that.
+
 ## 1.11.0
 
 Backs up a database larger than two gigabytes. Requires `manager-protocol ^1.5`.

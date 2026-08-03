@@ -201,7 +201,24 @@ class Tasks extends Component
             );
         }
 
-        $plugin->client->post('/api/connector/v1/system', $payload);
+        $response = $plugin->client->post('/api/connector/v1/system', $payload);
+
+        /*
+         | Which report versions the platform understands, from the platform.
+         |
+         | This site sends the oldest until it is told otherwise, so this is the only way it ever
+         | sends anything else. Deliberately one cycle behind: the answer arrives in the reply to a
+         | report, so the next run is the first that can use it.
+         |
+         | Nothing here is security-sensitive, which is why it is read from an ordinary reply rather
+         | than a signature-verified one like a capability set. The worst a tampered value could do
+         | is make this site send a version the platform then refuses, and it is refused either way.
+         */
+        if (is_array($response['accepted'] ?? null)) {
+            $plugin->connection->rememberSystemReportSchema(
+                array_values(array_filter($response['accepted'], 'is_string'))
+            );
+        }
 
         return 'Runtime reported.';
     }

@@ -41,27 +41,51 @@ use Throwable;
 class SystemReporter extends Component
 {
     /**
+     * Report versions this connector can build, newest first.
+     *
+     * Which one is actually sent is the platform's answer, not this plugin's preference — see
+     * {@see Connection::systemReportSchema()}. A site reports to a platform somebody else upgrades,
+     * so sending the newest by default would refuse every report until they caught up.
+     *
+     * @var list<string>
+     */
+    public const SCHEMAS = ['system.v2', 'system.v1'];
+
+    /**
+     * What to send until told otherwise. Every platform that has ever existed accepts this.
+     */
+    public const OLDEST_SCHEMA = 'system.v1';
+
+    /**
      * @return array{payload: array<string, mixed>, problems: list<string>}
      */
-    public function buildValidated(): array
+    public function buildValidated(?string $schema = null): array
     {
-        $payload = $this->build();
+        $schema ??= Plugin::getInstance()->connection->systemReportSchema();
+
+        $payload = $this->build($schema);
 
         return [
             'payload' => $payload,
-            'problems' => SchemaValidator::forSchema('system.v1')->validate($payload),
+            'problems' => SchemaValidator::forSchema($schema)->validate($payload),
         ];
     }
 
     /**
      * @return array<string, mixed>
      */
-    public function build(): array
+    public function build(?string $schema = null): array
     {
+        $schema ??= Plugin::getInstance()->connection->systemReportSchema();
+
+        if (!in_array($schema, self::SCHEMAS, true)) {
+            $schema = self::OLDEST_SCHEMA;
+        }
+
         $payload = [
-            'schema_version' => 'system.v1',
+            'schema_version' => $schema,
             'collected_at' => time(),
-            'storage' => $this->storage(),
+            'storage' => $this->storage($schema),
             'php' => $this->php(),
         ];
 
@@ -79,7 +103,7 @@ class SystemReporter extends Component
      *
      * @return array<string, mixed>
      */
-    private function storage(): array
+    private function storage(string $schema): array
     {
         $budget = max(1, Plugin::getInstance()->getSettings()->storageWalkSeconds);
         $deadline = microtime(true) + $budget;
@@ -100,7 +124,7 @@ class SystemReporter extends Component
                 continue;
             }
 
-            $volumes[] = $this->measureVolume($volume, $handle, $deadline, $measured);
+            $volumes[] = $this->measureVolume($volume, $handle, $deadline, $measured, $schema);
         }
 
         $storagePath = $this->safely(static fn(): string => Craft::$app->getPath()->getStoragePath(), '');
@@ -128,22 +152,110 @@ class SystemReporter extends Component
      * @param array<string, array{bytes: int, files: int, complete: bool}> $measured
      * @return array<string, mixed>
      */
-    private function measureVolume(mixed $volume, string $handle, float $deadline, array &$measured): array
+    private function measureVolume(mixed $volume, string $handle, float $deadline, array &$measured, string $schema): array
     {
         $path = $this->volumePath($volume);
 
+        /*
+         | Three ways to end up unmeasured, and until system.v2 they were one.
+         |
+         | A screen showing "Not measured" against a remote volume, a volume too big for the budget
+         | and a volume whose path cannot be opened was showing three situations wanting three
+         | different responses — nothing, a larger budget, and somebody fixing a configuration — as
+         | one grey badge. Saying which costs a string.
+         */
         if ($path === null || !is_dir($path)) {
-            return ['handle' => $handle, 'bytes' => 0, 'measured' => false];
+            $local = $this->isLocal($volume, $path);
+
+            return $this->describeVolume($schema, [
+                'handle' => $handle,
+                'bytes' => 0,
+                'measured' => false,
+            ], $local, $local === false ? 'remote' : 'unreadable');
         }
 
         $result = $measured[$path] ??= $this->directorySize($path, $deadline);
 
-        return [
+        return $this->describeVolume($schema, [
             'handle' => $handle,
             'bytes' => $result['bytes'],
             'files' => $result['files'],
             'measured' => $result['complete'],
-        ];
+        ], $this->isLocal($volume, $path), $result['complete'] ? null : 'timeout');
+    }
+
+    /**
+     * Add the fields the chosen schema has room for, and no others.
+     *
+     * `system.v1` sets `additionalProperties: false`, so a location or a reason sent to a platform
+     * that still speaks v1 would not be ignored — the whole report would be refused, silently,
+     * because a runtime report is fire-and-forget. Which version is in use is decided by the
+     * platform's own reply, and this is where that decision stops being abstract.
+     *
+     * @param  array<string, mixed>  $row
+     * @return array<string, mixed>
+     */
+    private function describeVolume(string $schema, array $row, ?bool $local, ?string $reason): array
+    {
+        if ($schema === self::OLDEST_SCHEMA) {
+            return $row;
+        }
+
+        if ($local !== null) {
+            $row['location'] = $local ? 'local' : 'remote';
+        }
+
+        if ($reason !== null) {
+            $row['unmeasured_reason'] = $reason;
+        }
+
+        return $row;
+    }
+
+    /**
+     * Whether this volume's files are on the server's own disk.
+     *
+     * Null rather than a guess when neither signal answers. Both fields are optional in system.v2
+     * precisely so that a connector facing an adapter shape it does not recognise can decline to
+     * say, and the platform then shows what it showed before — which is better than a confident
+     * "remote" against a local volume, because that would read as "these bytes are not on your
+     * disk" about bytes that are.
+     *
+     * Two signals, and they agree in every ordinary case:
+     *
+     *  - Craft's own local filesystem class. Checked as a string through `is_a`, not imported and
+     *    not type-hinted, for the same reason the rest of this file reaches everything through
+     *    `method_exists`: this plugin runs inside somebody else's Craft install and a hard
+     *    dependency on a class shape is how it starts failing on a version it could have tolerated.
+     *  - A resolvable root path. A remote adapter has no directory on this machine to name, so
+     *    anything that produced one is local whatever its class is called.
+     */
+    private function isLocal(mixed $volume, ?string $path): ?bool
+    {
+        $byClass = $this->safely(static function() use ($volume): ?bool {
+            $fs = $volume->getFs();
+
+            return is_a($fs, 'craft\\fs\\Local') ? true : null;
+        }, null);
+
+        if ($byClass === true) {
+            return true;
+        }
+
+        if ($path !== null && $path !== '') {
+            return true;
+        }
+
+        // No path and not Craft's local class. Every remote adapter lands here; so would a local
+        // one whose configuration is empty, which is why the caller reads this as "remote" only
+        // for the reason string and not as a claim about a volume it could otherwise measure.
+        return $this->safely(static function() use ($volume): ?bool {
+            $fs = $volume->getFs();
+
+            // getRootPath is what a filesystem with a directory on this machine implements. Absent
+            // means there is nothing local to point at.
+            return method_exists($fs, 'getRootPath') ? null : false;
+        }, null);
     }
 
     /**
