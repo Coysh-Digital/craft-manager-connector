@@ -64,16 +64,23 @@ composer require coysh-digital/craft-manager-connector
 php craft plugin/install manager-connector
 ```
 
-Set the platform URL in `config/manager-connector.php`:
+Installing does not create a config file, and the plugin runs without one — you are asked for the
+platform address on the pairing screen instead. Creating it is optional and recommended:
 
 ```php
+// config/manager-connector.php
 return [
     'platformUrl' => 'https://manager.example.org',
 ];
 ```
 
+Copy `vendor/coysh-digital/craft-manager-connector/src/config.php` if you want the commented version
+of every option.
+
 Kept in version control rather than in the database on purpose: pointing a site at a different
-Manager platform should take a deployment.
+Manager platform should take a deployment. With it set, the pairing screen shows the address as
+fixed, so this site cannot be repointed from the control panel. It is also the only place a recovery
+key fingerprint can be pinned — see [Backups](docs/backups.md).
 
 ## Pairing
 
