@@ -199,17 +199,28 @@ class BackupRunner extends Component
             /*
              | Where the bytes go.
              |
-             | Two paths, and the choice is made here rather than by the platform. A grant is only
-             | honoured when this site has a `backupUploadHost` configured, so an operator who has not
-             | opted in gets the ordinary path whatever the platform sends. Anything wrong with a grant
-             | — expired, malformed path, oversized — falls back rather than failing: the artifact is
-             | already encrypted and the platform can still take it, and losing a backup over a
-             | presigned URL that lapsed would be trading the thing that matters for the optimisation.
+             | Two paths, and neither of them lets the platform say where. A grant carries a path, a
+             | query and headers; the host is assembled by {@see Client::putToGrant} from this site's
+             | own configuration or, failing that, from the platform URL an operator typed at pairing.
+             | So the choice being made here is only whether to take the shorter route, never where it
+             | leads.
+             |
+             | This used to require `backupUploadHost` in the site's config file, and that opt-in was
+             | doing more harm than good: the setting lives on the customer's own server, most sites
+             | have no config file at all, and the result was every artifact on a metered hosted
+             | edition streaming through a web server for no reason — where an ordinary proxy body
+             | limit refuses it with a 413 nobody can explain. Deriving a host removes the opt-in
+             | without moving the decision anywhere near the platform.
+             |
+             | Anything wrong with a grant — expired, malformed path, oversized, or a host with no DNS
+             | behind it — falls back rather than failing. The artifact is already encrypted and the
+             | platform can still take it, and losing a backup over a presigned URL that lapsed would
+             | be trading the thing that matters for the optimisation.
              */
             $grant = is_array($declared['upload'] ?? null) ? $declared['upload'] : null;
             $uploadedDirect = false;
 
-            if ($grant !== null && trim($plugin->getSettings()->backupUploadHost) !== '') {
+            if ($grant !== null) {
                 try {
                     $plugin->client->putToGrant(
                         $encrypted['path'],

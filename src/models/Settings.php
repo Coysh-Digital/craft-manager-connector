@@ -163,13 +163,22 @@ class Settings extends Model
     /**
      * @var string Host to upload backup artifacts to, when the platform issues a direct upload grant.
      *
-     * Empty by default, which disables direct uploads entirely and sends artifacts through the
-     * platform as before.
+     * An **override**. Empty by default, and empty no longer means "no direct uploads": the host is
+     * then `uploads.` in front of the platform host from `platformUrl`, which an operator typed at
+     * pairing. Set this to send artifacts somewhere else — a bucket of your own, most usefully.
      *
-     * The platform supplies a path and a query string. It never supplies a host, and there is no code
-     * path by which it could: the URL is built as `https://` plus this value plus what it sent. That is
-     * stronger than checking a supplied host against an allow-list, because no host from the platform
-     * is used even as an input to a comparison.
+     * Empty used to disable direct uploads outright, and that default was the problem it was trying
+     * to be careful about. This setting lives in a config file on the customer's own server; most
+     * sites have no such file, so nobody opted in, so every artifact went through the platform's web
+     * server — where a default proxy body limit refuses it with a 413 that names nothing and appears
+     * in no log.
+     *
+     * What has not changed is the part that matters. The platform supplies a path and a query string.
+     * It never supplies a host, and there is still no code path by which it could — not per request
+     * and not at pairing. The URL is built as `https://` plus this value, or plus a host derived from
+     * one an operator typed, plus what the platform sent. That is stronger than checking a supplied
+     * host against an allow-list, because no host from the platform is used even as an input to a
+     * comparison. `bin/verify-invariants.php` fails the build if a third source ever appears.
      *
      * Config file only, for the same reason as the fingerprints above.
      */

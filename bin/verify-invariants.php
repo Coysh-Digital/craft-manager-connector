@@ -393,12 +393,25 @@ foreach (['lowerBackupFormatFloor', 'resetBackupFormatFloor', 'clearBackupFormat
     }
 }
 
-// The upload host is built from local configuration and never from platform-supplied data.
+// The upload host comes from the operator, and never from platform-supplied data.
 //
 // Checked as a shape, because the danger is a string concatenation that looks harmless. Only one
-// variable may follow a scheme literal, and its provenance is pinned separately below — matching on
-// the name alone would pass on any local called $configuredHost, including one assigned from a
-// response body.
+// variable may follow a scheme literal, and its provenance is pinned below — matching on the name
+// alone would pass on any local called $configuredHost, including one assigned from a response body.
+//
+// There are exactly two things an operator can have said, and therefore exactly two assignments
+// permitted anywhere in these files:
+//
+//   1. backupUploadHost in config/manager-connector.php, typed into a file on their own server.
+//   2. uploadHostFor($record->platformUrl) — derived from the platform URL they typed at pairing.
+//
+// The second one is new, and it is the reason this check got longer rather than shorter. Removing
+// the opt-in on direct uploads meant most sites acquiring a destination they had not written down,
+// and the obvious way to give them one — a host on the pairing response — is the thing this check
+// has always existed to refuse. A host the platform chose is a host a *compromised* platform chose;
+// pinning it at pairing narrows when that choice is made, not who makes it. Deriving it from a URL
+// the operator typed keeps the property intact: no value from the platform reaches this decision at
+// any point in the connection's life.
 foreach (['services/Client.php', 'services/BackupRunner.php'] as $relative) {
     $source = sourceWithoutComments($sourceDir.'/'.$relative);
 
@@ -406,10 +419,32 @@ foreach (['services/Client.php', 'services/BackupRunner.php'] as $relative) {
         $failures[] = "src/{$relative} builds a URL from a variable other than the configured upload host; a destination must never come from the platform (invariant 8).";
     }
 
-    if (str_contains($source, '$configuredHost')
-        && ! str_contains($source, '$configuredHost = trim($settings->backupUploadHost);')) {
-        $failures[] = "src/{$relative} uses \$configuredHost without assigning it from config/manager-connector.php (invariant 8).";
+    // Every assignment to $configuredHost, not merely the presence of one good one. An added third
+    // source would otherwise sit alongside the two expected ones and pass.
+    // (?!=) so that a comparison against '' is not read as an assignment from it.
+    preg_match_all('~\$configuredHost\s*=(?!=)\s*([^;]+);~', $source, $assignments);
+
+    foreach ($assignments[1] ?? [] as $assigned) {
+        $assigned = trim($assigned);
+
+        if ($assigned === 'trim($settings->backupUploadHost)'
+            || $assigned === 'self::uploadHostFor($record->platformUrl)') {
+            continue;
+        }
+
+        $failures[] = "src/{$relative} assigns \$configuredHost from '{$assigned}'; an upload destination may only come from config/manager-connector.php or from the paired platform URL (invariant 8).";
     }
+}
+
+// And the derivation itself takes the platform URL and nothing else.
+//
+// A signature gaining a second parameter is how this would be undone: uploadHostFor($url, $hint)
+// with the hint read off a grant would satisfy every check above while handing the platform the
+// decision back.
+if (preg_match('/function uploadHostFor\((.*?)\)/s', $client, $derivation) !== 1) {
+    $failures[] = 'src/services/Client.php no longer defines uploadHostFor(); the upload destination is derived somewhere else now (invariant 8).';
+} elseif (preg_replace('/\s+/', ' ', trim($derivation[1])) !== 'string $platformUrl') {
+    $failures[] = 'src/services/Client.php uploadHostFor() takes something other than the platform URL alone; a destination must never come from the platform (invariant 8).';
 }
 
 // And none of the three settings that carry these decisions may be editable from the control panel. A
