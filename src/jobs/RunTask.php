@@ -16,6 +16,7 @@ use coyshdigital\managerconnector\services\Tasks;
 use Craft;
 use craft\queue\BaseJob;
 use Throwable;
+use yii\queue\RetryableJobInterface;
 
 /**
  * Runs one connector task through Craft's queue.
@@ -28,7 +29,7 @@ use Throwable;
  * It is set by this plugin's own scheduler and cannot come from a request — but a queue payload is a
  * row in a database, and a row is a thing that can be edited.
  */
-class RunTask extends BaseJob
+class RunTask extends BaseJob implements RetryableJobInterface
 {
     /**
      * @var string One of the Tasks constants.
@@ -58,6 +59,40 @@ class RunTask extends BaseJob
 
             throw $e;
         }
+    }
+
+    /**
+     * How long the queue should reserve this job before deciding it has died.
+     *
+     * The queue's default is five minutes. That is fine for a heartbeat and wrong for the job that
+     * takes a backup: a large site dumps, encrypts and uploads for hours, and a queue that reclaims a
+     * job partway through does not stop the work already running — it starts a second copy of it, on
+     * a server currently writing a copy of its own database to its own disk.
+     *
+     * Derived from `uploadTimeout` rather than chosen independently, so an operator who has already
+     * raised the one number describing a slow upload does not have to find this one too. The upload
+     * is the long phase; the half hour on top covers the dump and the encryption.
+     */
+    public function getTtr(): int
+    {
+        return Plugin::getInstance()->getSettings()->uploadTimeout + 1800;
+    }
+
+    /**
+     * Never automatically.
+     *
+     * This preserves the behaviour this job already had — the queue's default is a single attempt —
+     * and it is worth stating rather than inheriting now that the interface asks. A failed backup is
+     * re-attempted by the schedule, on the platform's terms and with a fresh claim; retrying inside
+     * the queue would instead take a second dump of a production database because the first upload
+     * timed out.
+     *
+     * @param  int  $attempt
+     * @param  \Throwable  $error
+     */
+    public function canRetry($attempt, $error): bool
+    {
+        return false;
     }
 
     protected function defaultDescription(): ?string

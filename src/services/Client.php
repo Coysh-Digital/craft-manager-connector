@@ -18,8 +18,12 @@ use coyshdigital\managerprotocol\Nonce;
 use coyshdigital\managerprotocol\Protocol;
 use Craft;
 use craft\base\Component;
+use GuzzleHttp\ClientInterface;
 use GuzzleHttp\Exception\GuzzleException;
+use GuzzleHttp\Psr7\LimitStream;
+use GuzzleHttp\Psr7\Utils;
 use RuntimeException;
+use Throwable;
 
 /**
  * Sends signed requests to the Manager platform.
@@ -217,7 +221,15 @@ class Client extends Component
      * Redirects are refused rather than followed. A 307 from a storage service is a perfectly ordinary
      * thing that would, here, relocate a customer's database to wherever the response said.
      *
+     * An artifact past a few gigabytes cannot go in one request — object stores cap a single PUT at
+     * five — so a grant may instead describe a sequence of parts. Each part is its own presigned
+     * request with its own path and query, assembled against the same configured host by the same one
+     * line, and carrying a bounded slice of the file. Nothing about that changes what this method is
+     * allowed to be told: a part carries a path and headers, never a host, and the store checks the
+     * assembled whole against a checksum the platform committed to before the first byte was sent.
+     *
      * @param  array<string, string>  $headers  headers the presigned request committed to
+     * @param  list<array<string, mixed>>  $parts  presigned parts, in order; empty for a single request
      * @return array{status: int}
      */
     public function putToGrant(
@@ -227,6 +239,8 @@ class Client extends Component
         array $headers,
         int $expiresAt,
         int $maxBytes,
+        array $parts = [],
+        int $partBytes = 0,
     ): array {
         $settings = Plugin::getInstance()->getSettings();
 
@@ -243,8 +257,12 @@ class Client extends Component
             throw new RuntimeException('the configured backup upload host is not a bare hostname');
         }
 
-        if (!str_starts_with($grantPath, '/') || str_contains($grantPath, '..')) {
-            throw new RuntimeException('the platform issued an unusable upload path');
+        // The same rule for a part's path as for the whole grant's. A part is still a path within a
+        // bucket the operator already approved, and there are now many of them rather than one.
+        foreach ([$grantPath, ...array_map(static fn(array $p): string => (string) ($p['path'] ?? ''), $parts)] as $candidate) {
+            if (!str_starts_with($candidate, '/') || str_contains($candidate, '..')) {
+                throw new RuntimeException('the platform issued an unusable upload path');
+            }
         }
 
         if ($expiresAt <= time()) {
@@ -263,6 +281,92 @@ class Client extends Component
             throw new RuntimeException('the artifact is larger than the upload grant permits');
         }
 
+        $client = Craft::createGuzzleClient([
+            'timeout' => $settings->uploadTimeout,
+            'connect_timeout' => $settings->timeout,
+            'http_errors' => false,
+
+            // A storage service answering with a redirect must not be able to send a customer's
+            // database somewhere else.
+            'allow_redirects' => false,
+
+            // TLS verification, always, with no setting to turn it off. A "disable certificate
+            // checking" option exists to be switched on during a support call and left on.
+            'verify' => true,
+        ]);
+
+        // Assembled once, from the operator's own configuration, and reused for every request this
+        // method makes. A build check refuses any other variable in this position.
+        $base = 'https://' . $configuredHost;
+
+        if ($parts === []) {
+            return ['status' => $this->putSlice($client, $base . $grantPath . '?' . $grantQuery, $filePath, 0, $bytes, $headers)];
+        }
+
+        if ($partBytes <= 0) {
+            throw new RuntimeException('the platform issued parts without a part size');
+        }
+
+        /*
+         | Every part, in order, one at a time.
+         |
+         | Sequential rather than parallel on purpose. This runs inside a web request or a queue worker
+         | on somebody's production site, and saturating their uplink to finish a backup sooner is not
+         | this plugin's call to make.
+         |
+         | A part that fails is retried on its own rather than restarting the upload. On a twenty
+         | gigabyte artifact over a domestic connection, one dropped connection near the end would
+         | otherwise cost hours of a customer's bandwidth and get no further next time.
+         */
+        $status = 0;
+
+        foreach ($parts as $index => $part) {
+            $offset = $index * $partBytes;
+            $length = (int) min($partBytes, $bytes - $offset);
+
+            if ($length <= 0) {
+                throw new RuntimeException('the platform issued more parts than the artifact has bytes');
+            }
+
+            $url = $base . (string) ($part['path'] ?? '') . '?' . (string) ($part['query'] ?? '');
+            $partHeaders = is_array($part['headers'] ?? null) ? array_map('strval', $part['headers']) : [];
+
+            $attempts = 0;
+
+            while (true) {
+                $attempts++;
+
+                try {
+                    $status = $this->putSlice($client, $url, $filePath, $offset, $length, $partHeaders);
+
+                    break;
+                } catch (Throwable $e) {
+                    if ($attempts >= 3) {
+                        throw new RuntimeException(sprintf(
+                            'part %d of %d could not be uploaded: %s',
+                            $index + 1,
+                            count($parts),
+                            $e->getMessage(),
+                        ), 0, $e);
+                    }
+                }
+            }
+        }
+
+        return ['status' => $status];
+    }
+
+    /**
+     * Send one presigned request carrying a bounded slice of a file.
+     *
+     * The slice is a `LimitStream` over the open handle rather than a string, so a part is never held
+     * in memory — which is the whole reason an artifact this large can be uploaded from a Craft
+     * request at all.
+     *
+     * @param  array<string, string>  $headers
+     */
+    private function putSlice(ClientInterface $client, string $url, string $filePath, int $offset, int $length, array $headers): int
+    {
         $handle = fopen($filePath, 'rb');
 
         if ($handle === false) {
@@ -270,24 +374,10 @@ class Client extends Component
         }
 
         try {
-            $client = Craft::createGuzzleClient([
-                'timeout' => $settings->uploadTimeout,
-                'connect_timeout' => $settings->timeout,
-                'http_errors' => false,
-
-                // A storage service answering with a redirect must not be able to send a customer's
-                // database somewhere else.
-                'allow_redirects' => false,
-
-                // TLS verification, always, with no setting to turn it off. A "disable certificate
-                // checking" option exists to be switched on during a support call and left on.
-                'verify' => true,
-            ]);
-
-            $response = $client->put('https://' . $configuredHost . $grantPath . '?' . $grantQuery, [
-                'body' => $handle,
+            $response = $client->request('PUT', $url, [
+                'body' => new LimitStream(Utils::streamFor($handle), $length, $offset),
                 'headers' => array_merge($headers, [
-                    'Content-Length' => (string) $bytes,
+                    'Content-Length' => (string) $length,
                     'Content-Type' => 'application/octet-stream',
                 ]),
             ]);
@@ -305,7 +395,7 @@ class Client extends Component
             throw new RuntimeException("the artifact upload was refused with status {$status}");
         }
 
-        return ['status' => $status];
+        return $status;
     }
 
     public function putFile(string $path, string $filePath, string $contentHash): array

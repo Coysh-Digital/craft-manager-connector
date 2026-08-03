@@ -148,8 +148,8 @@ rather the schedule came from one place.
 |---|---|---|
 | `platformUrl` | empty | The Manager installation to report to. Setting it here fixes it: the control panel cannot then change it |
 | `timeout` | `10` | Seconds to wait for the platform. Short on purpose — a slow platform must never become a slow website |
-| `uploadTimeout` | `900` | Seconds to wait while uploading a backup, which is measured in megabytes rather than milliseconds |
-| `maxBackupMegabytes` | `2048` | Largest database this connector will attempt to back up. A safety valve, not a policy |
+| `uploadTimeout` | `900` | Seconds to wait while uploading a backup, which is measured in megabytes rather than milliseconds. Raise it on a site with a large database — a multi-gigabyte artifact on a slow uplink takes hours |
+| `maxBackupMegabytes` | `2048` | Largest database this connector will attempt to back up. A safety valve, not a policy. Ignored by Manager Cloud, which meters and bills the storage instead |
 | `sampleResponseTimes` | `true` | Time the site's own responses for the runtime report. One cache write per request into a fixed ring of 200 durations — a number and nothing else, no URL, visitor or address. Nothing is transmitted without `runtime:read` |
 | `storageWalkSeconds` | `5` | Seconds to spend measuring asset volumes before giving up on the rest. A volume that runs out of budget is reported as unmeasured rather than as empty |
 | `useQueue` | `false` | Also send the heartbeat through Craft's queue |

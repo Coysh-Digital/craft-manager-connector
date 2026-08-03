@@ -65,6 +65,11 @@ class Settings extends Model
      * rather than milliseconds. Still bounded: an upload that has stalled has to end eventually, and a
      * connector holding a socket open indefinitely is a connector holding a PHP process open
      * indefinitely.
+     *
+     * The default suits an ordinary site and the maximum does not pretend to. A twenty-gigabyte
+     * artifact on a domestic uplink is measured in hours, so the ceiling allows a day — but raising
+     * this is a deliberate act by somebody who knows their database is large, not a default anybody
+     * inherits.
      */
     public int $uploadTimeout = 900;
 
@@ -84,6 +89,11 @@ class Settings extends Model
      *
      * Self-hosted the reasoning is reversed and the setting stands: the operator who sets it also
      * owns the disk the dump lands on.
+     *
+     * The default stays at 2 GB. The validation ceiling used to be 10 GB, which was its own quiet
+     * trap: an operator could configure a value the wire contract would then refuse, and find out
+     * only after a dump had been taken and encrypted. That ceiling is gone from the protocol, so this
+     * one now bounds nothing but a typo.
      */
     public int $maxBackupMegabytes = 2048;
 
@@ -184,8 +194,8 @@ class Settings extends Model
             // accepts an explicit http://, which would put the enrolment code on the wire in clear.
             [['platformUrl'], 'url', 'defaultScheme' => 'https', 'validSchemes' => ['https']],
             [['timeout'], 'integer', 'min' => 1, 'max' => 60],
-            [['uploadTimeout'], 'integer', 'min' => 30, 'max' => 7200],
-            [['maxBackupMegabytes'], 'integer', 'min' => 1, 'max' => 10240],
+            [['uploadTimeout'], 'integer', 'min' => 30, 'max' => 86400],
+            [['maxBackupMegabytes'], 'integer', 'min' => 1, 'max' => 1048576],
             [['useQueue', 'webTrigger'], 'boolean'],
         ];
     }

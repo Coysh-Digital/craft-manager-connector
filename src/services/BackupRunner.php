@@ -48,13 +48,30 @@ use Throwable;
 class BackupRunner extends Component
 {
     /**
+     * @var string Cache key holding the size of the last dump this site took.
+     *
+     * Only ever a number of bytes, and only this site's own. It exists so the next run can tell
+     * whether there is room to work before it writes a copy of the database to a disk somebody is
+     * running a production site on. Never reported anywhere — a running byte count is a description
+     * of how large the database is, which `backup-progress.v1` refuses on purpose.
+     */
+    private const LAST_DUMP_BYTES = 'manager-connector.last-dump-bytes';
+
+    /**
      * Take a backup for a job and upload it.
      *
      * @param  list<array<string, mixed>>  $offeredRecipients  from a signature-verified claim response
+     * @param  list<string>  $acceptedDeclarations  schemas the platform accepts, most preferred first
      * @return array<string, mixed> the job result
      */
-    public function run(string $jobId, array $offeredRecipients = [], string $format = Protocol::BACKUP_FORMAT_V1, ?int $platformMaxMegabytes = null): array
-    {
+    public function run(
+        string $jobId,
+        array $offeredRecipients = [],
+        string $format = Protocol::BACKUP_FORMAT_V1,
+        ?int $platformMaxMegabytes = null,
+        array $acceptedDeclarations = [],
+        ?int $maxArtifactBytes = null,
+    ): array {
         $plugin = Plugin::getInstance();
 
         if (!$plugin->connection->hasCapability('backups:create')) {
@@ -85,6 +102,22 @@ class BackupRunner extends Component
             $useV2 = true;
         }
 
+        /*
+         | Which declaration to send, which is a separate question from which format to produce.
+         |
+         | v2 and v3 describe the same artifact — same envelope, same signing prefix, same encryption,
+         | same chunk size. What differs is only the sizes the two documents permit, so this is not a
+         | second ratchet and must not be treated as one: {@see Connection::backupFormatFloor()} is a
+         | one-way commitment about *who can read a backup*, and dragging a size question into it
+         | would make lifting a ceiling irreversible.
+         |
+         | So it is decided per run, from what the platform said it accepts. Silence means a platform
+         | older than v3, and v2 is the answer that has always worked.
+         */
+        $declaration = $useV2 && in_array('backup.v3', $acceptedDeclarations, true)
+            ? 'backup.v3'
+            : 'backup.v2';
+
         $recipients = [];
         $platformKey = null;
 
@@ -106,26 +139,38 @@ class BackupRunner extends Component
         $encrypted = null;
 
         try {
-            $dump = $this->takeDump($platformMaxMegabytes);
+            $dump = $this->takeDump($platformMaxMegabytes, $maxArtifactBytes);
 
             $encrypted = $useV2
-                ? $this->encryptToRecipients($dump, $jobId, $recipients)
+                ? $this->encryptToRecipients($dump, $jobId, $recipients, $declaration)
                 : $this->encrypt($dump['path'], (string) $platformKey);
 
             $declared = $plugin->client->post('/api/connector/v1/backups', $useV2
-                ? [
-                    'schema_version' => 'backup.v2',
+                ? array_filter([
+                    'schema_version' => $declaration,
                     'job_id' => $jobId,
                     'manifest_b64' => base64_encode($encrypted['manifest_bytes']),
                     'manifest_sha256' => hash('sha256', $encrypted['manifest_bytes']),
                     'manifest_signature' => $encrypted['manifest_signature'],
                     'artifact_sha256' => $encrypted['artifact_sha256'],
+
+                    /*
+                     | Only under v3, because v2 has `additionalProperties: false` and would refuse it.
+                     |
+                     | A transport checksum, not an integrity one. An artifact past a few gigabytes is
+                     | assembled from parts by the object store, and a store can only confirm a
+                     | whole-object checksum across an assembly when the algorithm linearises — CRC-32C
+                     | does, SHA-256 does not. `artifact_sha256` above is unchanged and is still what
+                     | binds these bytes for anybody verifying them offline.
+                     */
+                    'artifact_crc32c' => $declaration === 'backup.v3' ? $encrypted['artifact_crc32c'] : null,
+
                     'artifact_bytes' => $encrypted['artifact_bytes'],
                     // Where this site *intends* to send the bytes. The platform decides whether to
                     // offer a grant at all, so this is reported again by which endpoint settles the
                     // artifact rather than being believed from here.
                     'upload_mode' => trim($plugin->getSettings()->backupUploadHost) !== '' ? 'direct' : 'platform',
-                ]
+                ], static fn(mixed $value): bool => $value !== null)
                 : [
                     'schema_version' => 'backup.v1',
                     'job_id' => $jobId,
@@ -173,6 +218,12 @@ class BackupRunner extends Component
                         is_array($grant['headers'] ?? null) ? array_map('strval', $grant['headers']) : [],
                         (int) ($grant['expires_at'] ?? 0),
                         (int) ($grant['max_bytes'] ?? 0),
+
+                        // Present only when the artifact is too large for one request. The platform
+                        // decides where the boundaries fall, because it is the side that has to
+                        // reassemble them; this site only slices the file where it is told.
+                        is_array($grant['parts'] ?? null) ? array_values(array_filter($grant['parts'], 'is_array')) : [],
+                        (int) ($grant['part_bytes'] ?? 0),
                     );
 
                     $uploadedDirect = true;
@@ -230,9 +281,10 @@ class BackupRunner extends Component
      *
      * @param  array{path: string, taken_at: int, engine: string, engine_version: string, compressed: bool}  $dump
      * @param  list<array{fingerprint: string, public_key: string, label: string|null}>  $recipients
-     * @return array{path: string, manifest_bytes: string, manifest_signature: string, artifact_sha256: string, artifact_bytes: int, ciphertext_sha256: string, plaintext_sha256: string, ciphertext_bytes: int, plaintext_bytes: int}
+     * @param  string  $declaration  which declaration schema this artifact is being declared under
+     * @return array{path: string, manifest_bytes: string, manifest_signature: string, artifact_sha256: string, artifact_crc32c: string, artifact_bytes: int, ciphertext_sha256: string, plaintext_sha256: string, ciphertext_bytes: int, plaintext_bytes: int}
      */
-    private function encryptToRecipients(array $dump, string $jobId, array $recipients): array
+    private function encryptToRecipients(array $dump, string $jobId, array $recipients, string $declaration = 'backup.v2'): array
     {
         $plugin = Plugin::getInstance();
         $connection = $plugin->connection->current();
@@ -259,7 +311,10 @@ class BackupRunner extends Component
             $written = ArtifactStream::encrypt($input, $stream, $key);
 
             $manifest = [
-                'manifest_version' => 'backup-manifest.v2',
+                // Paired with the declaration rather than chosen separately. A v3 declaration carries
+                // a v3 manifest and a v2 one carries v2; the platform checks that pairing, and a
+                // matrix of the four combinations would be four things to get wrong instead of one.
+                'manifest_version' => $declaration === 'backup.v3' ? 'backup-manifest.v3' : 'backup-manifest.v2',
 
                 // Minted here, not by the platform. An artifact has to be able to name itself before
                 // any platform has seen it, or an exported file sitting in a customer's storage is
@@ -321,6 +376,23 @@ class BackupRunner extends Component
             }
         }
 
+        /*
+         | The plaintext dump goes now, not in the caller's `finally`.
+         |
+         | It is the most dangerous file that will ever exist on this server and the class docblock
+         | says it should exist for as short a time as possible — but until this line it survived until
+         | the upload finished, which on a large site is hours.
+         |
+         | It also decides how much disk a backup needs. Assembling the envelope holds the `.stream`
+         | and the `.artifact` at once, so with the dump still present the peak was three times the
+         | dump; now it is two. That is the difference between a 20 GB database needing 60 GB free and
+         | needing 40, on a disk the customer owns.
+         |
+         | The caller still shreds it in its `finally` for the paths that never reach here, and
+         | {@see self::shred()} returns quietly when the file is already gone.
+         */
+        $this->shred($dump['path']);
+
         $output = fopen($target, 'wb');
 
         if ($output === false) {
@@ -344,11 +416,14 @@ class BackupRunner extends Component
             $this->shred($streamPath);
         }
 
+        $checksums = $this->checksum($target);
+
         return [
             'path' => $target,
             'manifest_bytes' => $manifestBytes,
             'manifest_signature' => $manifestSignature,
-            'artifact_sha256' => (string) hash_file('sha256', $target),
+            'artifact_sha256' => $checksums['sha256'],
+            'artifact_crc32c' => $checksums['crc32c'],
             'artifact_bytes' => (int) filesize($target),
             'ciphertext_sha256' => $written['ciphertext_sha256'],
             'plaintext_sha256' => $written['plaintext_sha256'],
@@ -424,9 +499,11 @@ class BackupRunner extends Component
      *
      * @return array{path: string, taken_at: int, engine: string, engine_version: string, compressed: bool}
      */
-    private function takeDump(?int $platformMaxMegabytes = null): array
+    private function takeDump(?int $platformMaxMegabytes = null, ?int $maxArtifactBytes = null): array
     {
         $takenAt = time();
+
+        $this->assertRoomToWork();
 
         // Craft's own backup, using the connection the site already has. Not a command this connector
         // composed, and not one the platform had any say in.
@@ -470,8 +547,39 @@ class BackupRunner extends Component
         if ($limit > 0 && $bytes > $limit) {
             $this->shred($path);
 
-            throw new RuntimeException('the database is larger than this connector is configured to back up');
+            throw new RuntimeException(sprintf(
+                'the database is larger than this connector is configured to back up (%s, limit %s)',
+                $this->readableBytes($bytes),
+                $this->readableBytes($limit),
+            ));
         }
+
+        /*
+         | And what the platform said it will accept.
+         |
+         | Checked here rather than discovered from a 422 after the artifact has been encrypted and
+         | offered. The encrypted file is very close to the dump in size — the envelope is a couple of
+         | kilobytes and the stream adds seventeen bytes per megabyte — so the dump is a good enough
+         | proxy to refuse on, and refusing here saves a full encryption pass and a second copy of the
+         | database on the customer's disk.
+         |
+         | This is exactly the failure that produced this whole change: a site dumped and encrypted
+         | twenty gigabytes every night and was refused at the declaration, having done all the work
+         | and kept none of it. A platform that advertises nothing gets the old behaviour.
+         */
+        if ($maxArtifactBytes !== null && $maxArtifactBytes > 0 && $bytes > $maxArtifactBytes) {
+            $this->shred($path);
+
+            throw new RuntimeException(sprintf(
+                'the database is larger than the platform will accept (%s, limit %s)',
+                $this->readableBytes($bytes),
+                $this->readableBytes($maxArtifactBytes),
+            ));
+        }
+
+        // Recorded now that it is known, so the next run can decide whether there is room before it
+        // writes anything. No TTL, for the same reason the sequence counter has none.
+        Craft::$app->getCache()->set(self::LAST_DUMP_BYTES, $bytes);
 
         return [
             'path' => $path,
@@ -482,6 +590,72 @@ class BackupRunner extends Component
             // Craft gzips its backups when it can, which shows up in the filename.
             'compressed' => str_ends_with($path, '.gz') || str_ends_with($path, '.zip'),
         ];
+    }
+
+    /**
+     * Refuse before dumping if there is obviously not room to finish.
+     *
+     * A backup needs roughly twice the dump on disk: the dump itself, then the encrypted stream and
+     * the assembled artifact alongside each other while the envelope is written. Filling a production
+     * site's disk is a worse outcome than not taking a backup, and it is one this can see coming.
+     *
+     * Sized against the last dump this site actually took, cached the way {@see self::nextSequence()}
+     * caches its counter, because nothing else here knows how large the database is and asking it
+     * would mean a query describing the schema. With no history it cannot know, so it does not guess —
+     * a first run, or a cleared cache, passes through and the existing failure path stands.
+     *
+     * `@disk_free_space()` is the same call {@see SystemReporter} already makes, so there is no new
+     * dependency and nothing that shells out.
+     */
+    private function assertRoomToWork(): void
+    {
+        $previous = (int) Craft::$app->getCache()->get(self::LAST_DUMP_BYTES);
+
+        if ($previous <= 0) {
+            return;
+        }
+
+        $path = Craft::$app->getPath()->getDbBackupPath();
+        $free = $path === '' ? false : @disk_free_space($path);
+
+        if ($free === false) {
+            // Not measurable is not the same as not enough. A container with an unusual mount should
+            // not lose its backups to a check that exists to protect it.
+            return;
+        }
+
+        $needed = (int) ($previous * 2.2);
+
+        if ((int) $free >= $needed) {
+            return;
+        }
+
+        throw new RuntimeException(sprintf(
+            'there is not enough free disk to take a backup safely: about %s is needed and %s is free. '
+            . 'A backup holds the dump and the encrypted copy at once.',
+            $this->readableBytes($needed),
+            $this->readableBytes((int) $free),
+        ));
+    }
+
+    /**
+     * A size somebody can act on, rather than a number they have to divide.
+     *
+     * These go into failure messages an operator reads on their own site. "the database is larger than
+     * this connector is configured to back up" sent people to the wrong place often enough that the
+     * numbers are now in the sentence.
+     */
+    private function readableBytes(int $bytes): string
+    {
+        if ($bytes >= 1024 ** 3) {
+            return round($bytes / 1024 ** 3, 1) . ' GB';
+        }
+
+        if ($bytes >= 1024 ** 2) {
+            return round($bytes / 1024 ** 2) . ' MB';
+        }
+
+        return $bytes . ' bytes';
     }
 
     /**
@@ -565,6 +739,50 @@ class BackupRunner extends Component
      * such thing from userland PHP. What this does guarantee is that the file is not left sitting in the
      * site's storage directory waiting for the next person who finds a path traversal.
      */
+    /**
+     * Both of an artifact's checksums, in one pass over the file.
+     *
+     * One pass rather than two `hash_file()` calls, because on a twenty-gigabyte artifact the second
+     * pass is a second full read of a disk the customer is paying for and waiting on. Nothing is held
+     * in memory: the file is read a megabyte at a time and both contexts are fed the same buffer.
+     *
+     * The pair is not redundancy. SHA-256 is the integrity checksum — signed, covered by the request
+     * signature, and what `manager-restore verify` checks offline. CRC-32C exists only because an
+     * object store can confirm a whole-object CRC across a multipart assembly and cannot do the same
+     * for a SHA, which does not linearise. `crc32c` has been in `hash_algos()` since PHP 7.4, below
+     * this plugin's floor.
+     *
+     * @return array{sha256: string, crc32c: string}
+     */
+    private function checksum(string $path): array
+    {
+        $handle = fopen($path, 'rb');
+
+        if ($handle === false) {
+            throw new RuntimeException('could not read the backup artifact to check it');
+        }
+
+        $sha256 = hash_init('sha256');
+        $crc32c = hash_init('crc32c');
+
+        try {
+            while (!feof($handle)) {
+                $buffer = fread($handle, Protocol::ARTIFACT_CHUNK_BYTES);
+
+                if ($buffer === false) {
+                    throw new RuntimeException('could not read the backup artifact to check it');
+                }
+
+                hash_update($sha256, $buffer);
+                hash_update($crc32c, $buffer);
+            }
+        } finally {
+            fclose($handle);
+        }
+
+        return ['sha256' => hash_final($sha256), 'crc32c' => hash_final($crc32c)];
+    }
+
     private function shred(?string $path): void
     {
         if ($path === null || !is_file($path)) {
