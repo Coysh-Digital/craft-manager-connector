@@ -11,9 +11,10 @@ Four things, all of which must be true:
    see [Capabilities](/capabilities).
 2. Your organisation has at least one **active recovery key**. That is a keypair you generate on your
    own machine; Manager holds the public half and has nowhere to put the other one.
-3. You have pinned that key's fingerprint in `config/manager-connector.php`. Strictly speaking a backup
-   will still run without this, but read [The step people skip](#the-step-people-skip) before deciding
-   not to.
+3. You have pinned that key's fingerprint in `config/manager-connector.php` — creating that file if the
+   site does not have one, which most do not, because nothing creates it for you. Strictly speaking a
+   backup will still run without this, but read [The step people skip](#the-step-people-skip) before
+   deciding not to.
 4. Manager has queued a `backup.create` job, either on a schedule or because somebody pressed a button.
 
 ## What the plugin does
@@ -73,7 +74,7 @@ own screen labels them.
 ## The step people skip
 
 ```php
-// config/manager-connector.php
+// config/manager-connector.php — create it if this site has none
 'recoveryKeyFingerprints' => [
     'MGRK-4F3A-9C2B-7D18-E605-2A9F-33C1',
 ],

@@ -142,7 +142,8 @@ rather the schedule came from one place.
 
 ## Settings
 
-`config/manager-connector.php`:
+`config/manager-connector.php`, which you create yourself — nothing publishes it, and every default
+below applies to a site that has no such file:
 
 | Setting | Default | What it does |
 |---|---|---|

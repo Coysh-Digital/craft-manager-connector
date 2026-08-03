@@ -64,9 +64,10 @@ HTTPS. Signing makes a request tamper-evident, not unreadable.
 platform they control, and from that platform grant themselves backup permission and collect the
 database. This is the real risk of having a pairing screen at all.
 
-Mitigation: set `platformUrl` in `config/manager-connector.php`. When it is set the screen cannot
-override it, so the site can only ever pair with the platform you chose, and changing that takes a
-deployment. On a site with `allowAdminChanges` on, note that an administrator can already install
+Mitigation: set `platformUrl` in `config/manager-connector.php`, creating that file if the site has
+none — installing the plugin does not create it, so by default this mitigation is not in place. When
+it is set the screen cannot override it, so the site can only ever pair with the platform you chose,
+and changing that takes a deployment. On a site with `allowAdminChanges` on, note that an administrator can already install
 arbitrary plugins, which is unrestricted code execution — so on such a site this route adds nothing they
 did not have.
 
