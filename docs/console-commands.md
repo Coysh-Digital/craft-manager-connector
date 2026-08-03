@@ -37,7 +37,14 @@ the site has been taking to build its own pages. Requires `runtime:read`.
 **Run every 6 hours.** This is the one genuinely expensive command: it walks the asset volumes, and a
 volume with a million files on network storage takes real time. Disk usage moves over days, so hourly
 would be paying a cost every hour for a number nobody reads that often. The walk is bounded by
-`storageWalkSeconds`; a volume that runs out of budget is reported as unmeasured rather than as empty.
+`storageWalkSeconds`; a volume that runs out of budget is reported as unmeasured rather than as empty,
+and keeps the bytes it did reach so Manager can show them as a floor.
+
+A volume ends up unmeasured for one of three reasons, and from 1.12.0 the report says which: it is on
+remote storage and walking it would mean an API call per directory billed to you; the walk ran out of
+budget; or its path could not be opened, which is the only one of the three that is a fault. Each
+volume also reports whether it is on this server or on remote storage, so Manager can say that a
+remote volume's bytes are not on your disk. Neither field names a provider, a bucket or a region.
 
 ### `manager-connector/logins`
 

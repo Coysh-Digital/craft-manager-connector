@@ -207,6 +207,75 @@ class Connection extends Component
     }
 
     /**
+     * The runtime-report version this site should send.
+     *
+     * Defaults to the oldest, and only moves when the platform has said in a reply that it
+     * understands something newer. Assuming the newest is what would make a plugin upgrade a flag
+     * day: the two sides are upgraded by different people on different days, and a report refused
+     * for its version is refused silently — the report is fire-and-forget, so the symptom is a
+     * Health screen that stops moving rather than an error anybody sees.
+     *
+     * Bounded by what this connector can actually build, not by what the platform claims. A
+     * platform that advertised a version this plugin has never heard of would otherwise talk it
+     * into sending a payload it cannot produce.
+     */
+    public function systemReportSchema(): string
+    {
+        $stored = $this->current()?->systemReportSchema;
+
+        return in_array($stored, SystemReporter::SCHEMAS, true) ? $stored : SystemReporter::OLDEST_SCHEMA;
+    }
+
+    /**
+     * Record which report version the platform says it accepts.
+     *
+     * Not a ratchet, unlike the format floor below it, and the difference is what each one is about.
+     * That is a commitment this site makes about itself, which no response may weaken. This is a
+     * fact about somebody else's software: a platform can be rolled back, and a site can be pointed
+     * at a different one, so this has to be able to move down as well as up.
+     *
+     * The newest version both sides know wins. Anything this connector does not recognise is
+     * ignored rather than stored.
+     *
+     * @param  list<string>  $accepted  versions the platform advertised, newest first
+     * @return bool whether anything changed
+     */
+    public function rememberSystemReportSchema(array $accepted): bool
+    {
+        $record = $this->current();
+
+        if ($record === null) {
+            return false;
+        }
+
+        $chosen = null;
+
+        foreach (SystemReporter::SCHEMAS as $known) {
+            if (in_array($known, $accepted, true)) {
+                $chosen = $known;
+
+                break;
+            }
+        }
+
+        if ($chosen === null || $chosen === $record->systemReportSchema) {
+            return false;
+        }
+
+        $record->systemReportSchema = $chosen;
+        $record->save(false);
+
+        $this->cached = $record;
+
+        Craft::info(
+            "Manager Connector will send runtime reports as {$chosen}.",
+            'manager-connector',
+        );
+
+        return true;
+    }
+
+    /**
      * Commit this site to the zero-knowledge format, permanently.
      *
      * There is no counterpart. Lowering the floor means going back to backups the platform can read,

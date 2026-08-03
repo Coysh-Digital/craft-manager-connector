@@ -29,6 +29,7 @@ use DateTime;
  * @property string|null $capabilities JSON list of what the platform has granted
  * @property string|null $platformBackupPublicKey base64 X25519, legacy artifact encryption
  * @property string $backupFormatFloor 'v1' or 'v2'; raised once and never lowered by a response
+ * @property string $systemReportSchema the runtime-report version the platform accepts; moves either way
  * @property string $state
  * @property DateTime|null $pairedAt
  * @property DateTime|null $lastSuccessAt
