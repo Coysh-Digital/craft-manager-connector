@@ -140,10 +140,20 @@ would otherwise do, or lift a limit on a platform that has taken responsibility 
 result. It cannot redirect a backup or widen who is able to read one, which is what the two
 restrictions below are protecting.
 
-The upload goes to the platform URL stored at pairing. When direct-to-storage uploads are configured,
-Manager supplies a path and a query string and **never a host** — the URL is built from
-`backupUploadHost` in your own configuration, so no host Manager sent is used even as an input to a
-comparison. A script in this repository fails the build if that stops being true.
+The upload goes to the platform URL stored at pairing. When Manager offers a direct-to-storage upload
+it supplies a path and a query string and **never a host**. The URL is built from one of exactly two
+things, both of which you typed:
+
+- `backupUploadHost` in your own configuration, if you set it; or
+- `uploads.` in front of the platform host from `platformUrl` — the address you entered at pairing.
+
+So no host Manager sent is used, even as an input to a comparison, and not at pairing either. A
+platform compromised after you paired with it can vary the path inside a bucket you already reached
+and can do nothing else. A script in this repository fails the build if a third source ever appears,
+or if the derivation is given any argument other than the platform URL.
+
+If nothing answers at that name, the upload falls back to going through Manager, which is what every
+site did before this existed. Nothing is lost — the artifact is already encrypted by then.
 
 The recipient list works the same way and for the same reason: Manager may name keys, but only ones you
 have already pinned.

@@ -244,7 +244,32 @@ class Client extends Component
     ): array {
         $settings = Plugin::getInstance()->getSettings();
 
+        $record = Plugin::getInstance()->connection->current();
+
+        if ($record === null) {
+            throw new RuntimeException('This site is not paired with a Manager platform.');
+        }
+
         $configuredHost = trim($settings->backupUploadHost);
+
+        /*
+         | Where the destination comes from when this site has not named one.
+         |
+         | Derived from the platform URL an operator typed at pairing, and from nothing else. That is
+         | the whole property: no value the platform sent is used here, at pairing or per request, so
+         | a platform compromised after pairing can vary the path within a bucket and can do nothing
+         | else. The same guarantee the config file gave, without requiring one.
+         |
+         | It has to be that rather than a host on the pairing response, which is the obvious design
+         | and the wrong one. A host the platform chose is a host a *compromised* platform chose, and
+         | pinning it at pairing only narrows when the choice is made rather than who makes it.
+         |
+         | The config file still wins when set. An operator pointing sites at their own bucket has
+         | named a destination deliberately, and this must not quietly move it.
+         */
+        if ($configuredHost === '') {
+            $configuredHost = self::uploadHostFor($record->platformUrl);
+        }
 
         if ($configuredHost === '') {
             throw new RuntimeException('this site has no backup upload host configured');
@@ -396,6 +421,33 @@ class Client extends Component
         }
 
         return $status;
+    }
+
+    /**
+     * The upload host for a platform, when this site has not named one itself.
+     *
+     * `uploads.` in front of the host an operator typed at pairing, and that is the entire rule. It
+     * is a pure function of one string, deliberately: everything that makes this safe rests on there
+     * being no other input, so there is no parameter here that a platform response could reach.
+     *
+     * A platform that wants direct uploads points that name at its bucket. One that does not simply
+     * has no DNS there, its grants are refused at connect time, and {@see BackupRunner} falls back to
+     * uploading through the platform — which is what every site did before this existed.
+     *
+     * Returns an empty string rather than guessing when the URL has no host. The caller refuses on
+     * empty; a half-parsed URL must never become half a destination.
+     */
+    public static function uploadHostFor(string $platformUrl): string
+    {
+        $host = strtolower(trim((string) parse_url($platformUrl, PHP_URL_HOST)));
+
+        // The same bare-hostname rule the configured value is held to, applied to the derived one so
+        // that a malformed stored URL cannot produce something that is not a hostname at all.
+        if (preg_match('/^([a-z0-9]([a-z0-9-]*[a-z0-9])?\.)+[a-z]{2,}$/i', $host) !== 1) {
+            return '';
+        }
+
+        return 'uploads.' . $host;
     }
 
     public function putFile(string $path, string $filePath, string $contentHash): array
