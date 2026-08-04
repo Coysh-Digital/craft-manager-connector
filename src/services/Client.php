@@ -70,8 +70,27 @@ class Client extends Component
         $decoded = $this->decode($response['body']);
 
         if ($response['status'] !== 200) {
+            /*
+             | The platform's own explanation, ahead of the correlation identifier.
+             |
+             | This called attribution() alone, so a refusal that arrived with a reason attached
+             | discarded it and printed a correlation identifier instead — the same fault that was
+             | fixed on the artifact path, on the one request where the person who needs the answer
+             | is standing at a terminal watching it fail. They cannot look up a correlation
+             | identifier; they do not have the platform yet.
+             |
+             | It matters most for a refusal that is asking for something back. A platform that
+             | rejects the address this site typed can say which one to use instead, and that
+             | sentence is the whole remedy — printing "Correlation ID: unknown" in its place turns a
+             | one-line fix into a support question.
+             |
+             | reasonFrom() is the same fixed, platform-composed text it is everywhere else, and safe
+             | to print for the same reason: it describes the platform's own refusal and never
+             | anything this site reported.
+             */
             throw new RuntimeException(
                 'Pairing was refused by the platform.'
+                . $this->reasonFrom($decoded)
                 . $this->attribution($response['body'], $decoded, $response['headers'])
             );
         }
@@ -625,19 +644,6 @@ class Client extends Component
     }
 
     /**
-     * The identifier that ties this failure to a line in the platform's log.
-     *
-     * The body is preferred, because a rejection the platform composed deliberately puts it there.
-     * The header is the fallback, and it is the case that matters: an *unhandled* failure on the
-     * platform produces a body this site's operator cannot rely on — Laravel's own error shape, with
-     * no correlation identifier in it — so the connector reported "Correlation ID: unknown" and left
-     * nobody anything to search for. That was the whole of what a site could say about a backup that
-     * failed every time.
-     *
-     * @param  array<string, mixed>  $decoded
-     * @param  array<string, list<string>>  $headers
-     */
-    /**
      * Why the platform refused, when it said.
      *
      * The rejection body carries a `reason`, and this used to throw it away — reporting a bare
@@ -646,7 +652,8 @@ class Client extends Component
      * the actual explanation had arrived in the same response and been discarded.
      *
      * Safe to print. These are fixed messages the platform composes about its own refusal — a quota,
-     * an unrecognised format, a limit — never anything a site reported about its contents.
+     * an unrecognised format, a limit, an address this site should have paired against instead —
+     * never anything a site reported about its contents.
      *
      * @param  array<string, mixed>  $decoded
      */
@@ -702,6 +709,19 @@ class Client extends Component
         return ' Correlation ID: unknown';
     }
 
+    /**
+     * The identifier that ties this failure to a line in the platform's log.
+     *
+     * The body is preferred, because a rejection the platform composed deliberately puts it there.
+     * The header is the fallback, and it is the case that matters: an *unhandled* failure on the
+     * platform produces a body this site's operator cannot rely on — Laravel's own error shape, with
+     * no correlation identifier in it — so the connector reported "Correlation ID: unknown" and left
+     * nobody anything to search for. That was the whole of what a site could say about a backup that
+     * failed every time.
+     *
+     * @param  array<string, mixed>  $decoded
+     * @param  array<string, list<string>>  $headers
+     */
     private function correlationFrom(array $decoded, array $headers): string
     {
         $fromBody = $decoded['correlation_id'] ?? null;
