@@ -1,5 +1,57 @@
 # Changelog
 
+## 1.12.1
+
+Pairing points at the hostname a backup can actually travel to, and says so when it is refused.
+
+### A control panel's address is not necessarily an upload address
+
+The pairing screen prefilled the address Manager Cloud's control panel is served from. A browser
+wants a proxy in front of that hostname; a backup is one request carrying an entire encrypted
+database, and a proxy caps a request body.
+
+The result was a site that paired cleanly, reported cleanly, and then failed every backup with a
+413 — from something that is not the platform, so with no correlation identifier and nothing in the
+platform log, and only after the database had been dumped, encrypted and hashed. Two live sites
+failed that way nightly.
+
+The prefill now names the hostname published for connector traffic. **Only the starting value
+moved.** The field stays editable, a self-hosted installation still replaces it with its own address,
+and `platformUrl` in `config/manager-connector.php` still locks it — so nothing here decides a
+destination on a site's behalf, and `Client` is untouched.
+
+This does nothing for a site that has already paired. `platformUrl` is written only by
+`Connection::store()`, so an existing connection keeps the address it was given until somebody
+disconnects and pairs again.
+
+### A refused pairing threw the reason away
+
+1.10.1 fixed this for backups and left pairing behind. `pair()` called `attribution()` and not
+`reasonFrom()`, so a refusal that arrived with an explanation attached reported a bare status and a
+correlation identifier instead.
+
+Pairing is where that costs most. The person who needs the answer is at a terminal watching it fail,
+and a correlation identifier is no use to them — they have no access to the platform yet, which is
+the thing they are trying to arrange. It matters most for a refusal asking for something back: a
+platform rejecting the address a site typed can say which one to use, and that sentence is the whole
+remedy.
+
+`reasonFrom()` is unchanged, and is the same fixed, platform-composed text it is everywhere else —
+never anything a site reported about its own contents.
+
+### What was deliberately left out
+
+**Any way for a platform to redirect an upload.** The obvious reading of the first change is that a
+platform should be able to say "not here, over there", and that is exactly what invariant 8 refuses:
+a host the platform chose is a host a compromised platform chose. `$configuredHost` still comes only
+from `backupUploadHost` or `uploadHostFor($record->platformUrl)`, `putFile()` still accepts no
+destination argument, and redirects are still disabled. What moved is a value a person reads in a
+form and can type over.
+
+Also in here: a docblock returned to the function it describes. `correlationFrom()`'s had come adrift
+and was sitting above `reasonFrom()`, which therefore carried two — the first about a different
+function.
+
 ## 1.12.0
 
 Reports where each asset volume actually is, and why one could not be measured. Requires
