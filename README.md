@@ -53,9 +53,21 @@ work, the security model, the console commands, and troubleshooting.
 ## Installation
 
 ```bash
-composer require coysh-digital/craft-manager-connector
-php craft plugin/install manager-connector
+composer require "coysh-digital/craft-manager-connector:^1.12.1" -w && php craft plugin/install manager-connector
 ```
+
+Three details in that line, each of which has cost somebody a support message:
+
+- **The version is pinned and quoted.** Unquoted, `^` is a glob operator in zsh with
+  `extendedglob` set, which is the default on a lot of macOS setups - the shell eats the constraint
+  before Composer sees it.
+- **`-w`** is `--with-dependencies`, which lets Composer move the plugin's own dependencies rather
+  than refusing because one of them is already locked. If Composer answers that a *root* requirement
+  such as `craftcms/cms` is in the way, use `-W` (`--with-all-dependencies`) instead - Composer says
+  so in as many words when it happens.
+- **`&&` rather than two lines**, so the install does not run against a `composer require` that
+  failed. `plugin/install` on a plugin Composer did not manage to add fails with a message about the
+  handle, which sends people looking in the wrong place.
 
 Installing does not create a config file, and the plugin runs without one - you are asked for the
 platform address on the pairing screen instead. Creating it is optional and recommended:
@@ -102,7 +114,7 @@ The heartbeat carries no data at all. Hourly is plenty for the inventory report,
 numbers only change when you deploy. The update check runs daily and at an odd minute, so a fleet of
 sites does not all ask Craft's update service at once.
 
-`jobs` is what makes anything the platform asks for actually happen. Nothing is pushed to your site —
+`jobs` is what makes anything the platform asks for actually happen. Nothing is pushed to your site -
 the platform has no way to reach it - so this is the site choosing to ask.
 
 ## Commands
