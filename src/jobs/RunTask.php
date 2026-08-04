@@ -26,7 +26,7 @@ use yii\queue\RetryableJobInterface;
  * request happened to trigger it waits for nothing.
  *
  * The task name is validated against the closed set in {@see Tasks::schedule()} rather than trusted.
- * It is set by this plugin's own scheduler and cannot come from a request — but a queue payload is a
+ * It is set by this plugin's own scheduler and cannot come from a request - but a queue payload is a
  * row in a database, and a row is a thing that can be edited.
  */
 class RunTask extends BaseJob implements RetryableJobInterface
@@ -66,7 +66,7 @@ class RunTask extends BaseJob implements RetryableJobInterface
      *
      * The queue's default is five minutes. That is fine for a heartbeat and wrong for the job that
      * takes a backup: a large site dumps, encrypts and uploads for hours, and a queue that reclaims a
-     * job partway through does not stop the work already running — it starts a second copy of it, on
+     * job partway through does not stop the work already running - it starts a second copy of it, on
      * a server currently writing a copy of its own database to its own disk.
      *
      * Derived from `uploadTimeout` rather than chosen independently, so an operator who has already
@@ -81,7 +81,7 @@ class RunTask extends BaseJob implements RetryableJobInterface
     /**
      * Never automatically.
      *
-     * This preserves the behaviour this job already had — the queue's default is a single attempt —
+     * This preserves the behaviour this job already had - the queue's default is a single attempt —
      * and it is worth stating rather than inheriting now that the interface asks. A failed backup is
      * re-attempted by the schedule, on the platform's terms and with a fresh claim; retrying inside
      * the queue would instead take a second dump of a production database because the first upload

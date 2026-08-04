@@ -18,7 +18,7 @@ use craft\db\Migration;
  * Somewhere to keep the platform's artifact encryption key.
  *
  * Nullable and unbackfilled on purpose. An existing connection learns the key from its next
- * signature-verified claim response, the same way it learns its capability set — there is nothing
+ * signature-verified claim response, the same way it learns its capability set - there is nothing
  * useful to guess at here, and a column defaulted to some other platform's key would be worse than an
  * empty one.
  */

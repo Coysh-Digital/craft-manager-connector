@@ -2,7 +2,7 @@
 #
 # Create a disposable Craft 5 site for developing this plugin.
 #
-# The testbed itself is deliberately not version controlled — it is a throwaway Craft install, and
+# The testbed itself is deliberately not version controlled - it is a throwaway Craft install, and
 # checking one in would mean maintaining it. This script is the reproducible part: run it and you
 # get the same environment back.
 #

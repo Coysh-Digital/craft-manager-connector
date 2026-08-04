@@ -13,7 +13,7 @@ declare(strict_types=1);
  *
  * Those are properties of what this plugin registers, so they are checked by reading the source
  * rather than by booting Craft. That keeps this runnable in CI in a second, with no dependencies and
- * no Craft install — which means it actually gets run.
+ * no Craft install - which means it actually gets run.
  *
  * Deliberately conservative: it errs towards flagging something for a human to look at. A check that
  * only fires on a perfect match would miss the interesting cases.
@@ -33,7 +33,7 @@ $checks = 0;
  *
  * Every "does this source contain X" check below runs against this rather than the raw file. Scanning
  * raw text means a docblock explaining why the connector does not shell out reads, to the checker,
- * exactly like shelling out — and a check that prose can trip is a check people learn to phrase around
+ * exactly like shelling out - and a check that prose can trip is a check people learn to phrase around
  * instead of a check that holds.
  */
 function sourceWithoutComments(string $path): string
@@ -85,7 +85,7 @@ $sources = phpFilesIn($sourceDir);
 // So this no longer checks that no controller exists. It checks the properties that make the one that
 // does exist safe, which is a harder thing to satisfy by accident:
 //
-//   - no site routes at all, ever — those are genuinely public
+//   - no site routes at all, ever - those are genuinely public
 //   - control-panel routes limited to an allowlist written here
 //   - every web controller refuses anonymous access and requires an administrator
 //   - every state-changing action requires POST, so Craft's CSRF token is enforced
@@ -107,7 +107,7 @@ foreach ($sources as $file) {
 
 // The control-panel routes this plugin may register. Adding one is an edit here as well as there.
 // Empty, and it should stay that way. The screen is a Craft utility, which Craft routes, and the two
-// state-changing actions go through Craft's action mechanism — POST and a CSRF token, no URL rule.
+// state-changing actions go through Craft's action mechanism - POST and a CSRF token, no URL rule.
 // Nothing this plugin registers can be reached by following a link.
 $permittedCpRoutes = [];
 
@@ -187,7 +187,7 @@ foreach ($sources as $file) {
 // --------------------------------------------------------------------------------------------------
 //
 // The platform refuses to *issue* an unknown job type; this refuses to *execute* one. Two independent
-// refusals, because they protect against different failures — the platform's stops a mistake, the
+// refusals, because they protect against different failures - the platform's stops a mistake, the
 // connector's stops a compromised or impersonated platform.
 $checks++;
 
@@ -202,7 +202,7 @@ if (! preg_match('~if\s*\(\s*!\s*\$this->canHandle\(\$type\)\s*\)~', $runner)) {
 }
 
 // Dispatch must not be derived from the payload. A method name built from a job type, or a callable
-// resolved from a string, would turn the job type into a way to reach arbitrary code — which is
+// resolved from a string, would turn the job type into a way to reach arbitrary code - which is
 // invariant 8 by the back door.
 foreach (['call_user_func', 'call_user_func_array', '$this->$', '->{$', 'ReflectionMethod', 'invokeArgs'] as $dynamic) {
     if (str_contains($runner, $dynamic)) {
@@ -315,7 +315,7 @@ if (preg_match('~finally\s*\{.{0,400}?shred\(\$dump.{0,300}?shred\(\$encrypted~s
 // A backup is encrypted to keys the platform names, because the site has to be told which keys the
 // organisation holds and the platform is what tells it. That makes recipient selection an instruction
 // from an untrusted party, exactly like a destination would be. A Manager installation that had been
-// compromised, or compelled, could name a key of its own — and unlike a redirected upload there would
+// compromised, or compelled, could name a key of its own - and unlike a redirected upload there would
 // be no symptom at all. The backup would succeed. It would simply be readable by somebody else.
 //
 // So the same shape of defence: the answer comes from a file on this server rather than from the wire.
@@ -336,7 +336,7 @@ if (!is_file($recipientPinPath)) {
     // The pinned list must come from local settings, not from anything that arrived over the wire.
     //
     // Matched on the receiver as well as the property name. Checking for the bare name would pass on
-    // any mention of it anywhere in the file — including the unrelated one in isConfigured() — so a
+    // any mention of it anywhere in the file - including the unrelated one in isConfigured() - so a
     // version that read the list out of the platform's response would still have satisfied it. That
     // is not a hypothetical: it is what the first draft of this check did.
     if (!preg_match('~\$settings->recoveryKeyFingerprints~', $recipientPin)) {
@@ -362,7 +362,7 @@ if (!is_file($recipientPinPath)) {
 // arranged around not creating unnecessarily.
 //
 // Compared by position rather than matched as a pattern, and that is the second attempt. The obvious
-// regex — accept(...) followed by takeDump( — passes on a file where the order has been reversed,
+// regex - accept(...) followed by takeDump( - passes on a file where the order has been reversed,
 // because `takeDump(` also appears further down as the method's own declaration. A check that reports
 // success on the exact mutation it exists to catch is worse than no check.
 $acceptAt = strpos($backupRunner, 'recipientPin->accept(');
@@ -396,18 +396,18 @@ foreach (['lowerBackupFormatFloor', 'resetBackupFormatFloor', 'clearBackupFormat
 // The upload host comes from the operator, and never from platform-supplied data.
 //
 // Checked as a shape, because the danger is a string concatenation that looks harmless. Only one
-// variable may follow a scheme literal, and its provenance is pinned below — matching on the name
+// variable may follow a scheme literal, and its provenance is pinned below - matching on the name
 // alone would pass on any local called $configuredHost, including one assigned from a response body.
 //
 // There are exactly two things an operator can have said, and therefore exactly two assignments
 // permitted anywhere in these files:
 //
 //   1. backupUploadHost in config/manager-connector.php, typed into a file on their own server.
-//   2. uploadHostFor($record->platformUrl) — derived from the platform URL they typed at pairing.
+//   2. uploadHostFor($record->platformUrl) - derived from the platform URL they typed at pairing.
 //
 // The second one is new, and it is the reason this check got longer rather than shorter. Removing
 // the opt-in on direct uploads meant most sites acquiring a destination they had not written down,
-// and the obvious way to give them one — a host on the pairing response — is the thing this check
+// and the obvious way to give them one - a host on the pairing response - is the thing this check
 // has always existed to refuse. A host the platform chose is a host a *compromised* platform chose;
 // pinning it at pairing narrows when that choice is made, not who makes it. Deriving it from a URL
 // the operator typed keeps the property intact: no value from the platform reaches this decision at
@@ -464,8 +464,8 @@ foreach (['recoveryKeyFingerprints', 'requirePinnedRecoveryKeys', 'backupUploadH
 // --------------------------------------------------------------------------------------------------
 //
 // Invariant 17 asks for verifiable release artifacts, and a release whose version is ambiguous is not
-// one. This connector states its version in two places — the constant it signs into every request, and
-// composer.json — and a release adds a third in the git tag.
+// one. This connector states its version in two places - the constant it signs into every request, and
+// composer.json - and a release adds a third in the git tag.
 //
 // This check exists because those drifted: the constant went to 1.2.0 and composer.json stayed at
 // 1.1.0, so Packagist saw a tag that disagreed with the manifest and published nothing at all. The
@@ -494,8 +494,8 @@ if (preg_match("/const VERSION = '([^']+)'/", $pluginSource, $constant) !== 1) {
 //
 // The specification says TLS remains mandatory and that signing does not replace it. Those are
 // different properties and it is worth being precise about which: a signature makes a request
-// tamper-evident, it does not make it unreadable. Over plain HTTP the enrolment code — a bearer secret
-// until it is consumed — is visible to anything on the path, and so is every inventory report after it.
+// tamper-evident, it does not make it unreadable. Over plain HTTP the enrolment code - a bearer secret
+// until it is consumed - is visible to anything on the path, and so is every inventory report after it.
 //
 // Nothing enforced this until it was checked here: the settings rule supplied https as a *default*
 // scheme, which quietly accepts an explicit http://.
@@ -505,7 +505,7 @@ if (! str_contains($client, 'function requireSecureUrl(')) {
     $failures[] = 'src/services/Client.php no longer refuses a non-HTTPS platform URL. TLS is mandatory and signing does not replace it.';
 } else {
     // Every outbound path has to go through it, including the ones that read a stored URL rather than
-    // an argument — a record written by an older build must not be a way round this.
+    // an argument - a record written by an older build must not be a way round this.
     $callSites = preg_match_all('/requireSecureUrl\(/', $client);
 
     if ($callSites < 4) {

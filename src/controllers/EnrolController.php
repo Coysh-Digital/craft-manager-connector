@@ -29,7 +29,7 @@ use yii\web\Response;
  * It does not weaken invariants 4 and 5, and it is worth being precise about why rather than asserting
  * it. Invariant 4 forbids a **public** inbound management endpoint; these actions require an
  * authenticated Craft administrator and a POST carrying Craft's CSRF token. Invariant 5 requires
- * connections to be initiated outbound by the connector; that is exactly what happens — a button here
+ * connections to be initiated outbound by the connector; that is exactly what happens - a button here
  * causes this site to call the platform. Nothing about these routes lets the platform call in, and
  * nothing here accepts an instruction from the platform.
  *
@@ -71,7 +71,7 @@ class EnrolController extends Controller
         //
         // Not requireAdmin(). An owner who grants this permission means the holder to be able to use it,
         // and on managed hosting the person who looks after a site is often not a Craft administrator.
-        // The permission carries real authority and the screen says so — the same arrangement as Craft's
+        // The permission carries real authority and the screen says so - the same arrangement as Craft's
         // own Database Backup utility, which lets its holder download the entire database.
         $this->requirePermission('utility:' . ConnectorUtility::id());
 

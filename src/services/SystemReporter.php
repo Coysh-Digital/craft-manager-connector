@@ -28,14 +28,14 @@ use Throwable;
  *  - **Storage.** Byte counts and file counts per asset volume, by handle. Never a path, never a
  *    file name, never a listing. "The uploads volume holds 4.2 GB across 18,000 files" is an
  *    operational fact; "here is what is in it" is somebody else's content.
- *  - **PHP.** Numeric limits — memory, execution time, upload size, opcache. Never `phpinfo()`,
+ *  - **PHP.** Numeric limits - memory, execution time, upload size, opcache. Never `phpinfo()`,
  *    never an ini path, never a setting whose value is a filesystem location. The temptation is to
  *    send the lot because it is easy; the reason not to is that half of it names the host.
  *  - **Response times.** Sampled from ordinary traffic by {@see ResponseSampler}, which explains at
  *    length why this is server render time and not time to first byte.
  *
  * Every section is optional in the schema. A volume that cannot be walked, an opcache that is off, a
- * site too quiet to have samples — each simply produces less, and a shorter report is valid rather
+ * site too quiet to have samples - each simply produces less, and a shorter report is valid rather
  * than deficient.
  */
 class SystemReporter extends Component
@@ -43,7 +43,7 @@ class SystemReporter extends Component
     /**
      * Report versions this connector can build, newest first.
      *
-     * Which one is actually sent is the platform's answer, not this plugin's preference — see
+     * Which one is actually sent is the platform's answer, not this plugin's preference - see
      * {@see Connection::systemReportSchema()}. A site reports to a platform somebody else upgrades,
      * so sending the newest by default would refuse every report until they caught up.
      *
@@ -110,7 +110,7 @@ class SystemReporter extends Component
 
         // Walks already done this run, by resolved path. Craft forbids one volume's subpath from
         // overlapping another's on the same filesystem, so two volumes should never resolve to the
-        // same directory — but the budget above is shared by every walk in this method, and a
+        // same directory - but the budget above is shared by every walk in this method, and a
         // misconfiguration that made them collide would spend it twice and leave the storage
         // directory unmeasured. Cheaper to remember than to re-walk.
         $measured = [];
@@ -161,7 +161,7 @@ class SystemReporter extends Component
          |
          | A screen showing "Not measured" against a remote volume, a volume too big for the budget
          | and a volume whose path cannot be opened was showing three situations wanting three
-         | different responses — nothing, a larger budget, and somebody fixing a configuration — as
+         | different responses - nothing, a larger budget, and somebody fixing a configuration - as
          | one grey badge. Saying which costs a string.
          */
         if ($path === null || !is_dir($path)) {
@@ -188,7 +188,7 @@ class SystemReporter extends Component
      * Add the fields the chosen schema has room for, and no others.
      *
      * `system.v1` sets `additionalProperties: false`, so a location or a reason sent to a platform
-     * that still speaks v1 would not be ignored — the whole report would be refused, silently,
+     * that still speaks v1 would not be ignored - the whole report would be refused, silently,
      * because a runtime report is fire-and-forget. Which version is in use is decided by the
      * platform's own reply, and this is where that decision stops being abstract.
      *
@@ -217,7 +217,7 @@ class SystemReporter extends Component
      *
      * Null rather than a guess when neither signal answers. Both fields are optional in system.v2
      * precisely so that a connector facing an adapter shape it does not recognise can decline to
-     * say, and the platform then shows what it showed before — which is better than a confident
+     * say, and the platform then shows what it showed before - which is better than a confident
      * "remote" against a local volume, because that would read as "these bytes are not on your
      * disk" about bytes that are.
      *
@@ -261,7 +261,7 @@ class SystemReporter extends Component
     /**
      * Where one volume's files actually are.
      *
-     * A volume is a filesystem *and a subpath within it* — since Craft 4.4, and throughout 5 — and
+     * A volume is a filesystem *and a subpath within it* - since Craft 4.4, and throughout 5 - and
      * several volumes routinely share one filesystem. Craft has a validator dedicated to stopping
      * their subpaths overlapping, which only makes sense because the arrangement is expected. On
      * Craft 4.0 to 4.3 there is no subpath at all and one volume is one filesystem, which is exactly

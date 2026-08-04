@@ -212,7 +212,7 @@ class Connection extends Component
      * Defaults to the oldest, and only moves when the platform has said in a reply that it
      * understands something newer. Assuming the newest is what would make a plugin upgrade a flag
      * day: the two sides are upgraded by different people on different days, and a report refused
-     * for its version is refused silently — the report is fire-and-forget, so the symptom is a
+     * for its version is refused silently - the report is fire-and-forget, so the symptom is a
      * Health screen that stops moving rather than an error anybody sees.
      *
      * Bounded by what this connector can actually build, not by what the platform claims. A
@@ -416,7 +416,7 @@ class Connection extends Component
     /**
      * Encrypt with Craft's security key, then base64 the result.
      *
-     * encryptByKey() returns raw binary, which a UTF-8 text column will not accept — MySQL rejects
+     * encryptByKey() returns raw binary, which a UTF-8 text column will not accept - MySQL rejects
      * the insert outright rather than storing something corrupt, which is the better failure but
      * still a failure. Base64 keeps the stored value plain ASCII.
      */

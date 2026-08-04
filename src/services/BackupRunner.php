@@ -29,7 +29,7 @@ use Throwable;
  *
  *  - **The dump is Craft's own.** `Craft::$app->getDb()->backupTo()` uses the connection and the
  *    credentials the site already has. There is no `mysqldump` invocation here, no shell, and nothing
- *    the platform could influence — which is what keeps this inside invariant 8. The platform asked for
+ *    the platform could influence - which is what keeps this inside invariant 8. The platform asked for
  *    a backup; it did not say how to take one.
  *
  *  - **Nothing about the database is ever reported.** No credentials, no host, no DSN, no table names.
@@ -52,7 +52,7 @@ class BackupRunner extends Component
      *
      * Only ever a number of bytes, and only this site's own. It exists so the next run can tell
      * whether there is room to work before it writes a copy of the database to a disk somebody is
-     * running a production site on. Never reported anywhere — a running byte count is a description
+     * running a production site on. Never reported anywhere - a running byte count is a description
      * of how large the database is, which `backup-progress.v1` refuses on purpose.
      */
     private const LAST_DUMP_BYTES = 'manager-connector.last-dump-bytes';
@@ -105,7 +105,7 @@ class BackupRunner extends Component
         /*
          | Which declaration to send, which is a separate question from which format to produce.
          |
-         | v2 and v3 describe the same artifact — same envelope, same signing prefix, same encryption,
+         | v2 and v3 describe the same artifact - same envelope, same signing prefix, same encryption,
          | same chunk size. What differs is only the sizes the two documents permit, so this is not a
          | second ratchet and must not be treated as one: {@see Connection::backupFormatFloor()} is a
          | one-way commitment about *who can read a backup*, and dragging a size question into it
@@ -159,7 +159,7 @@ class BackupRunner extends Component
                      |
                      | A transport checksum, not an integrity one. An artifact past a few gigabytes is
                      | assembled from parts by the object store, and a store can only confirm a
-                     | whole-object checksum across an assembly when the algorithm linearises — CRC-32C
+                     | whole-object checksum across an assembly when the algorithm linearises - CRC-32C
                      | does, SHA-256 does not. `artifact_sha256` above is unchanged and is still what
                      | binds these bytes for anybody verifying them offline.
                      */
@@ -208,12 +208,12 @@ class BackupRunner extends Component
              | This used to require `backupUploadHost` in the site's config file, and that opt-in was
              | doing more harm than good: the setting lives on the customer's own server, most sites
              | have no config file at all, and the result was every artifact on a metered hosted
-             | edition streaming through a web server for no reason — where an ordinary proxy body
+             | edition streaming through a web server for no reason - where an ordinary proxy body
              | limit refuses it with a 413 nobody can explain. Deriving a host removes the opt-in
              | without moving the decision anywhere near the platform.
              |
-             | Anything wrong with a grant — expired, malformed path, oversized, or a host with no DNS
-             | behind it — falls back rather than failing. The artifact is already encrypted and the
+             | Anything wrong with a grant - expired, malformed path, oversized, or a host with no DNS
+             | behind it - falls back rather than failing. The artifact is already encrypted and the
              | platform can still take it, and losing a backup over a presigned URL that lapsed would
              | be trading the thing that matters for the optimisation.
              */
@@ -286,7 +286,7 @@ class BackupRunner extends Component
     /**
      * Encrypt a dump and seal its key to every recovery key this site accepted.
      *
-     * The key never leaves this machine in a form this machine can read back, exactly as under v1 — the
+     * The key never leaves this machine in a form this machine can read back, exactly as under v1 - the
      * difference is who can. Under v1 the platform could; here only somebody holding one of the
      * organisation's recovery private keys can, and this connector holds none of them.
      *
@@ -391,7 +391,7 @@ class BackupRunner extends Component
          | The plaintext dump goes now, not in the caller's `finally`.
          |
          | It is the most dangerous file that will ever exist on this server and the class docblock
-         | says it should exist for as short a time as possible — but until this line it survived until
+         | says it should exist for as short a time as possible - but until this line it survived until
          | the upload finished, which on a large site is hours.
          |
          | It also decides how much disk a backup needs. Assembling the envelope holds the `.stream`
@@ -466,7 +466,7 @@ class BackupRunner extends Component
      *
      * Its purpose is to make a rollback visible: two artifacts claiming the same sequence, or a gap
      * where the platform's list shows none, is something an operator can notice. It is not a security
-     * control on its own — a compromised site could report anything — and the documentation says so.
+     * control on its own - a compromised site could report anything - and the documentation says so.
      */
     private function nextSequence(): int
     {
@@ -569,8 +569,8 @@ class BackupRunner extends Component
          | And what the platform said it will accept.
          |
          | Checked here rather than discovered from a 422 after the artifact has been encrypted and
-         | offered. The encrypted file is very close to the dump in size — the envelope is a couple of
-         | kilobytes and the stream adds seventeen bytes per megabyte — so the dump is a good enough
+         | offered. The encrypted file is very close to the dump in size - the envelope is a couple of
+         | kilobytes and the stream adds seventeen bytes per megabyte - so the dump is a good enough
          | proxy to refuse on, and refusing here saves a full encryption pass and a second copy of the
          | database on the customer's disk.
          |
@@ -746,7 +746,7 @@ class BackupRunner extends Component
     /**
      * Remove a file, best effort.
      *
-     * Not a secure erase, and not claimed to be — on a copy-on-write filesystem or an SSD there is no
+     * Not a secure erase, and not claimed to be - on a copy-on-write filesystem or an SSD there is no
      * such thing from userland PHP. What this does guarantee is that the file is not left sitting in the
      * site's storage directory waiting for the next person who finds a path traversal.
      */
@@ -757,7 +757,7 @@ class BackupRunner extends Component
      * pass is a second full read of a disk the customer is paying for and waiting on. Nothing is held
      * in memory: the file is read a megabyte at a time and both contexts are fed the same buffer.
      *
-     * The pair is not redundancy. SHA-256 is the integrity checksum — signed, covered by the request
+     * The pair is not redundancy. SHA-256 is the integrity checksum - signed, covered by the request
      * signature, and what `manager-restore verify` checks offline. CRC-32C exists only because an
      * object store can confirm a whole-object CRC across a multipart assembly and cannot do the same
      * for a SHA, which does not linearise. `crc32c` has been in `hash_algos()` since PHP 7.4, below

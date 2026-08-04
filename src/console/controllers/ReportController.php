@@ -19,7 +19,7 @@ use yii\console\ExitCode;
 /**
  * php craft manager-connector/report
  *
- * Sends an inventory report. Runs less often than the heartbeat — hourly is plenty, since version
+ * Sends an inventory report. Runs less often than the heartbeat - hourly is plenty, since version
  * numbers do not change between deployments.
  */
 class ReportController extends BaseController

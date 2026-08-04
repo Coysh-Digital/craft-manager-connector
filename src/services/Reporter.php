@@ -40,7 +40,7 @@ class Reporter extends Component
      * Build a report covering only what this site has been granted.
      *
      * Gathering everything and then filtering would mean reading licence state, or the queue, for a
-     * site that never asked us to — so each section is only *collected* if the capability is held.
+     * site that never asked us to - so each section is only *collected* if the capability is held.
      * The filter afterwards is belt and braces.
      *
      * @return array<string, mixed>
@@ -159,7 +159,7 @@ class Reporter extends Component
             $edition = (int) $edition;
 
             // The int ladder is not stable across the versions this plugin now supports. Craft added
-            // the Team edition in 4.5 and inserted it at 1, moving Pro from 1 to 2 — so on Craft 4.0
+            // the Team edition in 4.5 and inserted it at 1, moving Pro from 1 to 2 - so on Craft 4.0
             // to 4.4 the same integer means Pro, and reading it with the modern ladder reports a Pro
             // site as "team". Wrong quietly, in a field an operator would have no reason to distrust,
             // which is why it is worth the version check rather than a comment.
@@ -186,7 +186,7 @@ class Reporter extends Component
         $engine = $db->getIsPgsql() ? 'pgsql' : 'mysql';
 
         // MariaDB reports itself through the MySQL driver, so the version string is the only way
-        // to tell them apart — and they diverge enough that the distinction matters.
+        // to tell them apart - and they diverge enough that the distinction matters.
         if ($engine === 'mysql' && stripos($version, 'mariadb') !== false) {
             $engine = 'mariadb';
         }

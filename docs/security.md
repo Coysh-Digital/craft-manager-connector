@@ -3,7 +3,7 @@
 This plugin runs inside somebody's production website, which is the whole reason it is shaped the way it
 is. This page is the threat model and what you can verify yourself.
 
-Security issues go privately to **hello@coysh.digital**, not to a public issue. See
+Security issues go privately to **support@managerforcraft.com**, not to a public issue. See
 [SECURITY.md](https://github.com/Coysh-Digital/craft-manager-connector/blob/main/SECURITY.md).
 
 ## What it holds, and what it does not
@@ -20,7 +20,7 @@ keys are stored there.
 ## Nothing inbound
 
 The plugin registers **no URL rules at all**. Its one screen is a Craft utility, which Craft routes, and
-its two actions go through Craft's action mechanism — POST with a CSRF token. Nothing it registers can
+its two actions go through Craft's action mechanism - POST with a CSRF token. Nothing it registers can
 be reached by following a link, and nothing at all can be reached without an authenticated control-panel
 session holding the utility permission.
 
@@ -30,7 +30,7 @@ lets a site behind NAT or a strict firewall be monitored with no inbound rule.
 ## Nothing to execute
 
 There is no console-command runner, no PHP evaluation, no SQL execution, no file reading or writing, and
-no arbitrary HTTP requests. Not gated — absent.
+no arbitrary HTTP requests. Not gated - absent.
 
 The plugin implements a fixed set of named operations and refuses any job type it does not already
 implement, whatever the platform says. That refusal is the plugin's own, independent of the platform's
@@ -44,7 +44,7 @@ having one.
 ## Every request is signed
 
 Each request carries the site identifier, this plugin's version, a timestamp, a random nonce, the HTTP
-method, the canonical path and a hash of the body — all covered by an Ed25519 signature.
+method, the canonical path and a hash of the body - all covered by an Ed25519 signature.
 
 The platform verifies the signature, rejects a timestamp outside a short tolerance, rejects a nonce it
 has seen before, and bounds the payload size. If its replay store is unreachable it **rejects** rather
@@ -65,10 +65,10 @@ platform they control, and from that platform grant themselves backup permission
 database. This is the real risk of having a pairing screen at all.
 
 Mitigation: set `platformUrl` in `config/manager-connector.php`, creating that file if the site has
-none — installing the plugin does not create it, so by default this mitigation is not in place. When
+none - installing the plugin does not create it, so by default this mitigation is not in place. When
 it is set the screen cannot override it, so the site can only ever pair with the platform you chose,
 and changing that takes a deployment. On a site with `allowAdminChanges` on, note that an administrator can already install
-arbitrary plugins, which is unrestricted code execution — so on such a site this route adds nothing they
+arbitrary plugins, which is unrestricted code execution - so on such a site this route adds nothing they
 did not have.
 
 **A compromised platform.** It can ask for the reports the site's capabilities already permit, and can
@@ -99,7 +99,7 @@ The second one is the interesting one. It reads the source and fails if the plug
 controller that does not require its permission, an action that changes state without POST, a means of
 execution, an unreviewed dependency, a way to transmit the private key, a backup destination that could
 come from a parameter, or a version that disagrees with itself. It needs no dependencies and no Craft
-install, so it runs in about a second — which is the point, because a check that is slow is a check that
+install, so it runs in about a second - which is the point, because a check that is slow is a check that
 gets skipped.
 
 ## Verifying a release

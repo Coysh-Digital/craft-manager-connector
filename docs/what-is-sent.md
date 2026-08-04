@@ -26,14 +26,14 @@ field. That means the boundary cannot drift without somebody noticing.
 - Plugin handles, names, versions, and whether each is enabled
 - Composer package names and versions
 
-**Licences** — requires `licences:read`
+**Licences** - requires `licences:read`
 
 - Whether Craft's licence is valid, on trial, or has a problem
 - The same for each plugin
 
 Calculated on the site. Licence keys themselves are never transmitted.
 
-**Configuration facts** — requires `security:read`
+**Configuration facts** - requires `security:read`
 
 Booleans only:
 
@@ -44,7 +44,7 @@ Booleans only:
 
 The *values* of configuration settings are never sent, and neither is any environment variable.
 
-**System state** — requires `system:read`
+**System state** - requires `system:read`
 
 - Queue depth, and how many jobs have failed
 - How many migrations are pending
@@ -52,26 +52,26 @@ The *values* of configuration settings are never sent, and neither is any enviro
 
 Counts only. Job payloads are never read, because a queued job can carry site content.
 
-**Disk, PHP limits and response times** — requires `runtime:read`
+**Disk, PHP limits and response times** - requires `runtime:read`
 
 - Bytes and file count per asset volume, identified by its handle
 - Free and total space on the volume Craft's storage directory sits on
 - PHP's memory limit, execution time, upload and post size limits, and input-var limit
 - Whether opcache is on, and how much of it is used
-- How many PHP extensions are loaded — the count, not the list
+- How many PHP extensions are loaded - the count, not the list
 - Mean, median, 95th-percentile and slowest page render times
 
 Sizes, never names. A byte count says how much is there and nothing about what: no path, no file
 name, no directory listing. A volume that cannot be walked inside the time budget, or that lives on
-remote storage, is reported as **unmeasured** — deliberately distinguishable from empty, because a
+remote storage, is reported as **unmeasured** - deliberately distinguishable from empty, because a
 partial figure presented as a total is how somebody concludes a volume was emptied overnight.
 
 The render times come from a fixed ring of at most 200 samples taken from traffic the site was
 already serving. Each sample is a duration and nothing else: no URL, no visitor, no address, no user
-agent. And it is **server render time, not time to first byte** — DNS, TLS, queueing in front of PHP
+agent. And it is **server render time, not time to first byte** - DNS, TLS, queueing in front of PHP
 and the network to the visitor are all outside what this can see.
 
-**Failed sign-in counts** — requires `logins:read`
+**Failed sign-in counts** - requires `logins:read`
 
 - How many control-panel sign-ins failed in the last 24 hours
 - How many accounts that spans
@@ -80,7 +80,7 @@ and the network to the visitor are all outside what this can see.
 - When the most recent failure was
 
 Counts only, and never who. There is no field for a username, an email address, a user id or a source
-address, and nothing keeps a per-attempt record — these are read from Craft's own counters rather
+address, and nothing keeps a per-attempt record - these are read from Craft's own counters rather
 than by watching sign-ins happen.
 
 Note the figures are a floor rather than a total: Craft clears an account's counter when somebody
@@ -88,7 +88,7 @@ signs in successfully, so an attempt that eventually worked leaves nothing behin
 
 ## Refused, in full
 
-Not "filtered", not "redacted" — a report containing any of these is rejected outright:
+Not "filtered", not "redacted" - a report containing any of these is rejected outright:
 
 - entries, assets, categories, or any other content
 - user records, email addresses, or password hashes
@@ -115,7 +115,7 @@ The pattern throughout is: report the *conclusion*, never the *evidence*.
 that too, and also your security key, your allowed hostnames and whatever else is in there. So the
 plugin computes the answer on your server and sends the answer.
 
-The same logic covers licences — a state rather than a key — and the queue: a count rather than the
+The same logic covers licences - a state rather than a key - and the queue: a count rather than the
 jobs, because a job payload can contain anything a developer put in it.
 
 ## Backups are different, and separate

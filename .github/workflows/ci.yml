@@ -33,8 +33,8 @@ jobs:
     runs-on: ubuntu-latest
 
     # Both majors are analysed, and this matrix is load-bearing rather than thorough-looking. Craft 4
-    # and 5 differ in exactly two places that matter to this plugin — the utility registration event
-    # was renamed, and `Craft::$app->edition` went from int to backed enum — and neither raises an
+    # and 5 differ in exactly two places that matter to this plugin - the utility registration event
+    # was renamed, and `Craft::$app->edition` went from int to backed enum - and neither raises an
     # error at boot. Attaching a listener to an event nothing dispatches is silent, so a plugin built
     # against the wrong constant installs cleanly on Craft 4 and simply has no pairing screen. The
     # Craft 4 leg caught precisely that, which is the argument for keeping it.
@@ -70,7 +70,7 @@ jobs:
       #
       # This unblocks resolution on the Craft 4 leg only. The Craft 5 leg's `composer audit --locked`
       # below is untouched and still blocks, and that is the step actually guarding this connector's
-      # own dependency surface — `manager-protocol` and ext-sodium, identical on both legs.
+      # own dependency surface - `manager-protocol` and ext-sodium, identical on both legs.
       #
       # Composer renamed this key in 2.10; try the current name and fall back for older runners.
       - name: Allow Craft 4's unfixable Twig advisories to resolve
@@ -89,7 +89,7 @@ jobs:
       # here blocks rather than warns.
       #
       # Craft 5 only, and not because the Craft 4 leg is trusted less. Craft 4 pins `twig/twig
-      # ~3.19.0`, which carries published advisories with no fix inside that constraint — so the step
+      # ~3.19.0`, which carries published advisories with no fix inside that constraint - so the step
       # would be permanently red there through no fault of this plugin, and a check that is always
       # red carries no information. What it is actually guarding is this connector's own dependency
       # surface, which is `manager-protocol` and ext-sodium and is identical on both legs, so auditing

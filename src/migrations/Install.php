@@ -54,7 +54,7 @@ class Install extends Migration
             // this site pins recovery fingerprints or completes a v2 backup, and never lowered by a
             // response. Craft marks every non-install migration as applied on a fresh install without
             // running it, so a column that exists only in m260805_090000 exists only on sites that
-            // upgraded into it — it has to be created here as well.
+            // upgraded into it - it has to be created here as well.
             'backupFormatFloor' => $this->string(8)->notNull()->defaultValue('v1'),
 
             // Which runtime-report schema the platform understands, learned from its own replies and

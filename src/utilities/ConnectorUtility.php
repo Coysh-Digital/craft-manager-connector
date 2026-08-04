@@ -22,7 +22,7 @@ use craft\base\Utility;
  *
  * The first is reachability, and an earlier version of this comment had it wrong. With
  * `allowAdminChanges` genuinely off, Craft renders the plugins list but **does not link** a plugin's
- * settings page — so enrolment behind plugin settings is undiscoverable on exactly the hardened
+ * settings page - so enrolment behind plugin settings is undiscoverable on exactly the hardened
  * production sites that most need it. The first test of this appeared to show otherwise because the
  * setting was being overridden by CRAFT_ALLOW_ADMIN_CHANGES in the environment, which takes precedence
  * over config/general.php. Utilities are unaffected and stay in the navigation.
@@ -69,7 +69,7 @@ class ConnectorUtility extends Utility
      *
      * Both accessors live here on purpose. Craft 4 calls `iconPath()` and has never heard of
      * `icon()`; Craft 5 calls `icon()` and ignores this. Declaring both is what lets one class serve
-     * both majors, and it is the only genuine API divergence between them in this plugin — the rest
+     * both majors, and it is the only genuine API divergence between them in this plugin - the rest
      * of the connector's Craft surface is identical across the two.
      */
     public static function iconPath(): ?string

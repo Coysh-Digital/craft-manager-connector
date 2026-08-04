@@ -28,7 +28,7 @@ features:
 
 Manager Connector is the part of [Manager for Craft](https://managerforcraft.com) that lives inside
 a Craft installation. It answers questions like "what version is this running", "is it patched",
-"are its licences valid" and "did the backup run" — so you can see the answers for every site you
+"are its licences valid" and "did the backup run" - so you can see the answers for every site you
 look after on one screen, rather than logging into ten control panels.
 
 It is deliberately small. It runs inside somebody's production website, which is the strongest
@@ -66,12 +66,12 @@ anything.
 This plugin works with either, and is identical for both.
 
 **[Manager Self-Hosted](https://github.com/Coysh-Digital/manager)** is free, source-available and
-feature-complete — no reduced edition and nothing held back. Running it means running a
+feature-complete - no reduced edition and nothing held back. Running it means running a
 security-sensitive service: a patched server, Postgres and Redis, TLS, encryption keys backed up
 separately, and a store holding a copy of every managed site's database.
 
 **[Manager Cloud](https://managerforcraft.com)** is that, hosted by Coysh Digital. Same connector,
-same protocol, same security boundaries — the server, the keys, the storage and the on-call rota are
+same protocol, same security boundaries - the server, the keys, the storage and the on-call rota are
 ours.
 
 Moving between them means re-pairing your sites, not rebuilding anything.

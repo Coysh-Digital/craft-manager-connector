@@ -22,7 +22,7 @@ use yii\console\ExitCode;
  * Prints exactly what this site would report, without sending it.
  *
  * Here so an administrator can satisfy themselves about what leaves their server rather than taking
- * the documentation's word for it. Works whether or not the site is paired, and — deliberately —
+ * the documentation's word for it. Works whether or not the site is paired, and - deliberately —
  * whether or not the capability behind each report has been granted: the question this answers is
  * "what would this reveal if I turned it on", which has to be answerable *before* turning it on.
  *

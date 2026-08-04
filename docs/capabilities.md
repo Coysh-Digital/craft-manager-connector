@@ -18,7 +18,7 @@ site gets one of them.
 
 ### `runtime:read` and why it is separate from `system:read`
 
-The two look similar and are not. `system:read` reads numbers Craft already has in memory — the queue
+The two look similar and are not. `system:read` reads numbers Craft already has in memory - the queue
 depth, the migration count. `runtime:read` **walks directory trees** to size the asset volumes, and
 **times requests** the site is serving.
 
@@ -31,8 +31,8 @@ execution, upload and post limits; opcache state and memory; a count of loaded e
 median, 95th-percentile and slowest render times.
 
 What it never sends: a path, a file name, a directory listing, `phpinfo()`, an ini path, the list of
-extensions, or any URL, visitor or address from the requests it timed. A volume it cannot walk — too
-large for the time budget, or on remote storage — is reported as *unmeasured*, never as empty.
+extensions, or any URL, visitor or address from the requests it timed. A volume it cannot walk - too
+large for the time budget, or on remote storage - is reported as *unmeasured*, never as empty.
 
 The timings are **server render time, not time to first byte**. The connector times its own site from
 inside the PHP process, so DNS, TLS, queueing in front of PHP and the network to the visitor are all
@@ -48,7 +48,7 @@ affected accounts are administrators.
 
 **Never a username, an email address, a user id or the address anybody connected from.** These are
 read from Craft's own `invalidLoginCount`, `lastInvalidLoginDate` and `lockoutDate` columns rather
-than by listening for login failures and keeping a log — a record of who tried to sign in as whom,
+than by listening for login failures and keeping a log - a record of who tried to sign in as whom,
 from where, is a log of real people's behaviour on your website, and there is no reason for a
 monitoring platform to hold one.
 
@@ -61,7 +61,7 @@ nothing behind in them.
 Pairing grants `inventory:read` and nothing else. Everything further is a deliberate act by somebody
 in Manager, per site, recorded with who did it and when.
 
-The five read capabilities can be granted with a switch. `backups:create` cannot — see below.
+The five read capabilities can be granted with a switch. `backups:create` cannot - see below.
 
 ## Revoking
 
@@ -92,7 +92,7 @@ unencrypted upload.
 
 ## What no capability permits
 
-There is no capability — present or planned — that permits:
+There is no capability - present or planned - that permits:
 
 - running a Craft console command
 - evaluating PHP

@@ -20,8 +20,8 @@ use Throwable;
  * How long this site takes to build a response.
  *
  * Sampled here rather than measured from the platform, and the difference is the whole design. The
- * platform never calls out to a site — that is what lets a connector work from behind NAT with no
- * inbound port — so there is nobody outside to hold a stopwatch. What there is, already, is a
+ * platform never calls out to a site - that is what lets a connector work from behind NAT with no
+ * inbound port - so there is nobody outside to hold a stopwatch. What there is, already, is a
  * listener on requests that were happening anyway.
  *
  * **This is not time to first byte, and must not be presented as though it were.** It measures the
@@ -32,7 +32,7 @@ use Throwable;
  *
  * Three properties make it safe to leave switched on:
  *
- *  - **It stores numbers, not requests.** A duration and nothing else — no URL, no query string, no
+ *  - **It stores numbers, not requests.** A duration and nothing else - no URL, no query string, no
  *    user, no address. A record of who fetched what and when would be a log of real people's
  *    behaviour on somebody else's website, and there is no stated purpose for collecting it.
  *  - **It is bounded.** A fixed-size ring in the cache, so a busy site and a quiet one cost the
@@ -73,7 +73,7 @@ class ResponseSampler extends Component
         try {
             // `Plugin::getInstance()`, like every other service here. This read used to call
             // `Plugin::instanceOrNull()`, which does not exist on any class in the hierarchy and was
-            // additionally resolving against this namespace rather than the plugin's — so it raised an
+            // additionally resolving against this namespace rather than the plugin's - so it raised an
             // Error, the catch below swallowed it, and no response time was ever recorded. The runtime
             // report's `response` section was silently always absent, which looks exactly like a site
             // that had turned the setting off.
