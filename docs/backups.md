@@ -11,7 +11,7 @@ Four things, all of which must be true:
    see [Capabilities](/capabilities).
 2. Your organisation has at least one **active recovery key**. That is a keypair you generate on your
    own machine; Manager holds the public half and has nowhere to put the other one.
-3. You have pinned that key's fingerprint in `config/manager-connector.php` — creating that file if the
+3. You have pinned that key's fingerprint in `config/manager-connector.php` - creating that file if the
    site does not have one, which most do not, because nothing creates it for you. Strictly speaking a
    backup will still run without this, but read [The step people skip](#the-step-people-skip) before
    deciding not to.
@@ -30,7 +30,7 @@ Four things, all of which must be true:
 4. **Encrypts the dump** as a chunked authenticated stream, so nothing large is ever held in memory and
    a modified or truncated artifact is detected as such rather than read as a shorter backup.
 5. **Seals that key once per recovery key.** This plugin holds only public halves, so it cannot reopen
-   what it sealed — a site compromised in September cannot recover the keys to artifacts it uploaded in
+   what it sealed - a site compromised in September cannot recover the keys to artifacts it uploaded in
    June.
 6. **Writes a manifest and signs it** with this site's own signing key, then wraps it around the
    encrypted stream. The result is a self-describing file: everything needed to decrypt it is inside
@@ -46,7 +46,7 @@ has already written a complete copy of your database to disk.
 ## Encryption, stated plainly
 
 **Manager cannot read your backups.** The key that opens an artifact is sealed only to your
-organisation's recovery keys, and Manager has never held the other half of one — there is no column in
+organisation's recovery keys, and Manager has never held the other half of one - there is no column in
 its database for a recovery private key, no escrow copy, and no support process that could produce one.
 Somebody who stole Manager's database *and* its object storage would have ciphertext, wrapped keys they
 cannot open, and metadata.
@@ -54,8 +54,8 @@ cannot open, and metadata.
 That is a much stronger claim than this page used to make, so here is exactly where it stops.
 
 **It depends on you pinning fingerprints.** Manager tells this site which keys to encrypt to, because
-the site has no other way to learn them. A Manager installation that had been compromised — or that was
-compelled — could name a key of its own, and without pins this site would encrypt to it. Nothing would
+the site has no other way to learn them. A Manager installation that had been compromised - or that was
+compelled - could name a key of its own, and without pins this site would encrypt to it. Nothing would
 look wrong. See below.
 
 **It does not protect a compromised Craft site.** This server holds the database. Anybody with code
@@ -74,13 +74,13 @@ own screen labels them.
 ## The step people skip
 
 ```php
-// config/manager-connector.php — create it if this site has none
+// config/manager-connector.php - create it if this site has none
 'recoveryKeyFingerprints' => [
     'MGRK-4F3A-9C2B-7D18-E605-2A9F-33C1',
 ],
 ```
 
-Get the fingerprint from `manager-restore fingerprint recovery-key.pub` — the file on your machine, not
+Get the fingerprint from `manager-restore fingerprint recovery-key.pub` - the file on your machine, not
 the value on Manager's screen. Comparing Manager's screen against Manager's own claim proves nothing;
 it can display whatever it likes.
 
@@ -104,7 +104,7 @@ Two of them:
   early with a clear message beats failing late with a full volume.
 
   **Self-hosted only. Manager Cloud ignores it.** A platform that stores and meters the artifact may
-  lift this limit, and Cloud does — the storage is its own, already metered and billed, so a database
+  lift this limit, and Cloud does - the storage is its own, already metered and billed, so a database
   that has grown past a number nobody chose is a thing to charge for rather than refuse. This file
   lives on your server and most sites have no config file at all, so the default was acting as a
   ceiling that had never been picked. Reporting to your own Manager, the reasoning reverses and the
@@ -146,7 +146,7 @@ it supplies a path and a query string and **never a host**. The URL is built fro
 things, both of which you typed:
 
 - `backupUploadHost` in your own configuration, if you set it; or
-- `uploads.` in front of the platform host from `platformUrl` — the address you entered at pairing.
+- `uploads.` in front of the platform host from `platformUrl` - the address you entered at pairing.
 
 So no host Manager sent is used, even as an input to a comparison, and not at pairing either. A
 platform compromised after you paired with it can vary the path inside a bucket you already reached
@@ -154,7 +154,7 @@ and can do nothing else. A script in this repository fails the build if a third 
 or if the derivation is given any argument other than the platform URL.
 
 If nothing answers at that name, the upload falls back to going through Manager, which is what every
-site did before this existed. Nothing is lost — the artifact is already encrypted by then.
+site did before this existed. Nothing is lost - the artifact is already encrypted by then.
 
 The recipient list works the same way and for the same reason: Manager may name keys, but only ones you
 have already pinned.
@@ -163,7 +163,7 @@ have already pinned.
 
 The declaration is metadata. It contains no database credentials, no connection string, no table names,
 no row counts, no schema, and no sample of the contents. The progress report carries a job identifier,
-one word from a fixed list, and a timestamp — deliberately not a path, a byte count or the table
+one word from a fixed list, and a timestamp - deliberately not a path, a byte count or the table
 currently being written, all of which describe your data under a heading that looks harmless.
 
 ## Restoring

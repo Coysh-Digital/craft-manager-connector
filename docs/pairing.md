@@ -6,11 +6,11 @@ uses a code that works once, and it leaves the site holding a key that never lea
 ## What actually happens
 
 1. In Manager, somebody adds the site and issues an **enrolment code**. Manager stores only a SHA-256
-   hash of it — there is no screen, route or column that will show the code again.
+   hash of it - there is no screen, route or column that will show the code again.
 2. You paste the code into this plugin, in the control panel or on the console.
 3. The plugin generates an Ed25519 keypair **on your server**.
 4. It sends the code, the **public** half of the keypair, its version and this site's hostname to
-   Manager. Over HTTPS, which is required — see below.
+   Manager. Over HTTPS, which is required - see below.
 5. Manager verifies and consumes the code in one atomic step, records the public key against the site,
    and replies with the site's identifier, its own public key, and the capabilities it has granted.
 6. That reply is **signed**, and the plugin verifies the signature before storing anything. A failure
@@ -25,7 +25,7 @@ server, encrypted with Craft's security key.
 **Utilities → Manager Connector**. Paste the code and press **Pair this site**.
 
 If `platformUrl` is set in `config/manager-connector.php` the address is shown as fixed and cannot be
-changed from this screen. If it is not set, you will be asked for it — check it carefully, because it
+changed from this screen. If it is not set, you will be asked for it - check it carefully, because it
 is where this site's operational state will be sent.
 
 ## From the console
@@ -45,7 +45,7 @@ php craft manager-connector/pair --platformUrl=https://manager.example.org mgr_e
 The plugin refuses a platform address that is not HTTPS, and there is no option to override it.
 
 A signature makes a request tamper-evident; it does not make it unreadable. Over plain HTTP the
-enrolment code is legible to anything on the path — and it is a bearer secret until it is consumed —
+enrolment code is legible to anything on the path - and it is a bearer secret until it is consumed —
 as is every report that follows. ddev and every usable tunnelling service provide real certificates,
 so an override would only enable the mistake.
 
@@ -99,5 +99,5 @@ php craft manager-connector/disconnect
 Or the **Disconnect** button on the utility screen.
 
 It deletes the signing key from this site, so the credentials stop working immediately. **Revoke the
-connector in Manager too** — the platform has no way to know a site has disconnected itself, and will
+connector in Manager too** - the platform has no way to know a site has disconnected itself, and will
 go on expecting reports until it notices the silence.

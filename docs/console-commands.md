@@ -6,7 +6,7 @@ Eight commands, one per thing you might want to do. All of them are safe to run 
 
 ### `manager-connector/heartbeat`
 
-Says "still here". Carries no site data beyond this plugin's version — reporting anything more would be
+Says "still here". Carries no site data beyond this plugin's version - reporting anything more would be
 collection without a stated purpose.
 
 This is what makes a site look alive in the fleet table. Without it Manager will eventually report the
@@ -19,7 +19,7 @@ site as not reporting, which is accurate but not what you want.
 Sends the inventory report: versions, plugin and package lists, and whatever the site's capabilities
 permit. See [What is sent](/what-is-sent).
 
-**Run hourly.** More often achieves little — the answers change when you deploy, not by the minute.
+**Run hourly.** More often achieves little - the answers change when you deploy, not by the minute.
 
 ### `manager-connector/updates`
 
@@ -48,7 +48,7 @@ remote volume's bytes are not on your disk. Neither field names a provider, a bu
 
 ### `manager-connector/logins`
 
-Reports counts of failed control-panel sign-ins — attempts, accounts affected, accounts locked out,
+Reports counts of failed control-panel sign-ins - attempts, accounts affected, accounts locked out,
 and how many of those are administrators. Never usernames or addresses. Requires `logins:read`.
 
 **Run every 30 minutes.** It is one indexed query, and frequent enough that an attack in progress is
@@ -56,7 +56,7 @@ visible while it is still in progress.
 
 ### `manager-connector/jobs`
 
-Claims and runs whatever work Manager has queued for this site — an immediate inventory refresh, an
+Claims and runs whatever work Manager has queued for this site - an immediate inventory refresh, an
 update check, or a backup.
 
 **Run every 5 minutes.** This is what makes a button in Manager appear to do something promptly.
@@ -79,7 +79,7 @@ The `--platformUrl` option is only needed when `platformUrl` is not in your conf
 
 Deletes this site's signing key. The credentials stop working immediately.
 
-Revoke the connector in Manager as well — the platform cannot know a site has disconnected itself.
+Revoke the connector in Manager as well - the platform cannot know a site has disconnected itself.
 
 ## Inspecting
 
@@ -98,7 +98,7 @@ Worth running before you pair, if you want to see what you are agreeing to rathe
 it. It uses the same builders the real reports use, so there is no version of it that could differ from
 what actually goes out.
 
-Covers **every** report — inventory, updates, system and logins — and shows each one whether or not its
+Covers **every** report - inventory, updates, system and logins - and shows each one whether or not its
 capability has been granted, marking which is which. That is deliberate: the question this answers is
 "what would this reveal if I turned it on", which has to be answerable before turning it on.
 
@@ -116,7 +116,7 @@ Add `--report=logins` for one at a time. Valid values are `report`, `updates`, `
 ```
 
 Schedule all six even if the site has not been granted every capability. A command whose capability is
-missing exits immediately saying so and costs nothing — whereas a cron entry nobody adds when the
+missing exits immediately saying so and costs nothing - whereas a cron entry nobody adds when the
 capability is granted six months later produces a screen that reads "granted, but nothing reported
 yet" indefinitely, with no obvious reason why.
 
@@ -129,11 +129,11 @@ is due, the next request to the site pushes a queue job and returns; Craft's que
 the visitor whose request triggered it waits for nothing.
 
 Traffic cannot amplify it. Whether the site gets ten requests an hour or ten thousand, each task fires
-at most once per interval — the claim is an atomic cache write, so two simultaneous requests cannot
+at most once per interval - the claim is an atomic cache write, so two simultaneous requests cannot
 both take it.
 
 What it needs is for Craft's queue to actually run. That is Craft's default (`runQueueAutomatically`).
-If you have turned that off, something else has to run the queue — a queue daemon, `craft-async-queue`,
+If you have turned that off, something else has to run the queue - a queue daemon, `craft-async-queue`,
 or a cron entry, in which case you may as well schedule the connector directly.
 
 Two honest limitations, which is why cron is still the recommendation where it is available:
@@ -149,15 +149,15 @@ rather the schedule came from one place.
 
 ## Settings
 
-`config/manager-connector.php`, which you create yourself — nothing publishes it, and every default
+`config/manager-connector.php`, which you create yourself - nothing publishes it, and every default
 below applies to a site that has no such file:
 
 | Setting | Default | What it does |
 |---|---|---|
 | `platformUrl` | empty | The Manager installation to report to. Setting it here fixes it: the control panel cannot then change it |
-| `timeout` | `10` | Seconds to wait for the platform. Short on purpose — a slow platform must never become a slow website |
-| `uploadTimeout` | `900` | Seconds to wait while uploading a backup, which is measured in megabytes rather than milliseconds. Raise it on a site with a large database — a multi-gigabyte artifact on a slow uplink takes hours |
+| `timeout` | `10` | Seconds to wait for the platform. Short on purpose - a slow platform must never become a slow website |
+| `uploadTimeout` | `900` | Seconds to wait while uploading a backup, which is measured in megabytes rather than milliseconds. Raise it on a site with a large database - a multi-gigabyte artifact on a slow uplink takes hours |
 | `maxBackupMegabytes` | `2048` | Largest database this connector will attempt to back up. A safety valve, not a policy. Ignored by Manager Cloud, which meters and bills the storage instead |
-| `sampleResponseTimes` | `true` | Time the site's own responses for the runtime report. One cache write per request into a fixed ring of 200 durations — a number and nothing else, no URL, visitor or address. Nothing is transmitted without `runtime:read` |
+| `sampleResponseTimes` | `true` | Time the site's own responses for the runtime report. One cache write per request into a fixed ring of 200 durations - a number and nothing else, no URL, visitor or address. Nothing is transmitted without `runtime:read` |
 | `storageWalkSeconds` | `5` | Seconds to spend measuring asset volumes before giving up on the rest. A volume that runs out of budget is reported as unmeasured rather than as empty |
 | `useQueue` | `false` | Also send the heartbeat through Craft's queue |

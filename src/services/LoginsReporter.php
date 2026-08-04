@@ -21,14 +21,14 @@ use Throwable;
 /**
  * Failed sign-ins to the control panel, as counts.
  *
- * Read from Craft's own columns on the users table — `invalidLoginCount`, `lastInvalidLoginDate`,
- * `lockoutDate` — rather than by listening for login-failure events and keeping a log. That choice
+ * Read from Craft's own columns on the users table - `invalidLoginCount`, `lastInvalidLoginDate`,
+ * `lockoutDate` - rather than by listening for login-failure events and keeping a log. That choice
  * is the point of this class, so it is worth stating why.
  *
  * A listener would let this plugin build a record of who tried to sign in as whom, from where, and
  * when. That is a log of real people's behaviour on somebody else's website, held by a third party,
- * for a purpose nobody has stated. The operator's actual question — "is this site being attacked,
- * and is anybody locked out" — is answered by four integers, and four integers is therefore what
+ * for a purpose nobody has stated. The operator's actual question - "is this site being attacked,
+ * and is anybody locked out" - is answered by four integers, and four integers is therefore what
  * crosses the wire. No username, no email address, no user id, no source address, no per-attempt
  * record.
  *
@@ -43,7 +43,7 @@ class LoginsReporter extends Component
      * How far back to count.
      *
      * A day. `lastInvalidLoginDate` records only the most recent failure per account, so a longer
-     * window does not gather more history — it just keeps stale accounts in the total for longer.
+     * window does not gather more history - it just keeps stale accounts in the total for longer.
      */
     private const WINDOW_HOURS = 24;
 

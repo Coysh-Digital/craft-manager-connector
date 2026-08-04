@@ -17,7 +17,7 @@ use craft\base\Model;
  * Plugin settings.
  *
  * Deliberately thin. What the connector may do is decided by the platform through capabilities,
- * not here — a setting on this side would be one a compromised site could change.
+ * not here - a setting on this side would be one a compromised site could change.
  */
 class Settings extends Model
 {
@@ -33,7 +33,7 @@ class Settings extends Model
      * @var bool Drive the schedule from ordinary web traffic, for hosting with no cron.
      *
      * On by default, because the alternative failure is a site that pairs successfully and then reports
-     * nothing at all — which looks like a broken plugin rather than a missing scheduled task.
+     * nothing at all - which looks like a broken plugin rather than a missing scheduled task.
      *
      * Costs one cache read per request. When a task is due it pushes a queue job and returns; the
      * visitor whose request triggered it waits for nothing.
@@ -67,7 +67,7 @@ class Settings extends Model
      * indefinitely.
      *
      * The default suits an ordinary site and the maximum does not pretend to. A twenty-gigabyte
-     * artifact on a domestic uplink is measured in hours, so the ceiling allows a day — but raising
+     * artifact on a domestic uplink is measured in hours, so the ceiling allows a day - but raising
      * this is a deliberate act by somebody who knows their database is large, not a default anybody
      * inherits.
      */
@@ -101,7 +101,7 @@ class Settings extends Model
      * @var bool Time the site's own responses, for the runtime report.
      *
      * On by default, and cheap: one cache write per request into a fixed-size ring of two hundred
-     * durations. It stores a number and nothing else — no URL, no visitor, no address — because a
+     * durations. It stores a number and nothing else - no URL, no visitor, no address - because a
      * record of who fetched what would be a log of real people's behaviour on somebody else's
      * website, and there is no stated purpose for collecting that.
      *
@@ -115,7 +115,7 @@ class Settings extends Model
      *
      * Walking a directory tree is the one genuinely expensive thing this plugin does, and an asset
      * volume with a million files on network storage can take minutes. A volume that runs out of
-     * budget is reported as unmeasured rather than as empty — those are different facts and only one
+     * budget is reported as unmeasured rather than as empty - those are different facts and only one
      * of them is alarming.
      */
     public int $storageWalkSeconds = 5;
@@ -126,7 +126,7 @@ class Settings extends Model
      * **This is the most important setting in the plugin.** Everything else about backup encryption
      * assumes it is set.
      *
-     * A backup is encrypted to keys the platform names. That is unavoidable — the site has to be told
+     * A backup is encrypted to keys the platform names. That is unavoidable - the site has to be told
      * which keys the organisation holds, and the platform is what tells it. Which means a Manager
      * installation that had been compromised, or that was compelled, could name a key of its own, and
      * this site would encrypt to it with nothing looking wrong from either end.
@@ -138,7 +138,7 @@ class Settings extends Model
      *
      * It lives in `config/manager-connector.php`, in your version control, on your server. Changing it
      * takes a deployment. The platform cannot reach it. That is the entire idea, and it is why this
-     * setting is deliberately **not** editable from the control panel — a hijacked control-panel
+     * setting is deliberately **not** editable from the control panel - a hijacked control-panel
      * session that could re-pin this site would defeat the only control that actually works.
      *
      * Empty by default, because a plugin that shipped with somebody's fingerprint in it would be
@@ -156,7 +156,7 @@ class Settings extends Model
      *
      * The reason for the weaker default is that the stronger one turns "we have not finished the
      * setup" into "we have no backups", silently, on the day somebody needs one. Turn it on once the
-     * fleet is pinned — the documentation says so, and so does the control panel.
+     * fleet is pinned - the documentation says so, and so does the control panel.
      */
     public bool $requirePinnedRecoveryKeys = false;
 
@@ -165,16 +165,16 @@ class Settings extends Model
      *
      * An **override**. Empty by default, and empty no longer means "no direct uploads": the host is
      * then `uploads.` in front of the platform host from `platformUrl`, which an operator typed at
-     * pairing. Set this to send artifacts somewhere else — a bucket of your own, most usefully.
+     * pairing. Set this to send artifacts somewhere else - a bucket of your own, most usefully.
      *
      * Empty used to disable direct uploads outright, and that default was the problem it was trying
      * to be careful about. This setting lives in a config file on the customer's own server; most
      * sites have no such file, so nobody opted in, so every artifact went through the platform's web
-     * server — where a default proxy body limit refuses it with a 413 that names nothing and appears
+     * server - where a default proxy body limit refuses it with a 413 that names nothing and appears
      * in no log.
      *
      * What has not changed is the part that matters. The platform supplies a path and a query string.
-     * It never supplies a host, and there is still no code path by which it could — not per request
+     * It never supplies a host, and there is still no code path by which it could - not per request
      * and not at pairing. The URL is built as `https://` plus this value, or plus a host derived from
      * one an operator typed, plus what the platform sent. That is stronger than checking a supplied
      * host against an allow-list, because no host from the platform is used even as an input to a

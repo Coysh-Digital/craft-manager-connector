@@ -1,7 +1,7 @@
 {# Manager Connector settings.
 
    Almost read-only. The only things this screen can change are pairing and disconnecting, and they
-   are here because the console is not always available — plenty of Craft sites run on managed hosting
+   are here because the console is not always available - plenty of Craft sites run on managed hosting
    with no shell, and "you need SSH" would exclude them rather than inconvenience them.
 
    Both actions require an administrator and a POST carrying Craft's CSRF token, and both are outbound:
@@ -44,17 +44,17 @@
             {# Prefilled with Manager Cloud, which is where most sites pair. It is a starting value and
                not a setting: the field stays editable, and a self-hosted installation replaces it with
                its own address. Sites that must not choose for themselves set `platformUrl` in
-               config/manager-connector.php, which locks the field entirely — the branch above.
+               config/manager-connector.php, which locks the field entirely - the branch above.
 
                Cloud publishes a dedicated hostname for connector traffic rather than the address its
                control panel is served from. A backup artifact is a single request carrying the whole
                encrypted database, and the host a browser talks to is not necessarily configured to
-               accept one — an intermediary that refuses the body answers before the platform is
+               accept one - an intermediary that refuses the body answers before the platform is
                reached, which costs a site its backup and reports almost nothing about why. Pairing
                against the published connector hostname is what keeps the two concerns separate. #}
             {{ forms.autosuggestField({
                 label: "Manager platform"|t('manager-connector'),
-                instructions: "The address of your Manager installation. Defaults to Manager Cloud; replace it if you self-host. Must be HTTPS — a signed request over plain HTTP is still readable in transit, including the code below. Check it carefully: this is where the site's operational state will be sent."|t('manager-connector'),
+                instructions: "The address of your Manager installation. Defaults to Manager Cloud; replace it if you self-host. Must be HTTPS - a signed request over plain HTTP is still readable in transit, including the code below. Check it carefully: this is where the site's operational state will be sent."|t('manager-connector'),
                 id: 'platformUrl',
                 name: 'platformUrl',
                 value: 'https://api.managerforcraft.com',
@@ -134,7 +134,7 @@
                         {#
                             Which format this site is on decides what "no key" means.
 
-                            Under v2 the platform's own artifact key is discarded on purpose — see
+                            Under v2 the platform's own artifact key is discarded on purpose - see
                             Connection::raiseFormatFloor, which nulls it the moment the floor is
                             raised. Reading platformBackupPublicKey alone therefore reported a
                             correctly configured zero-knowledge site as broken, permanently, on the
@@ -142,7 +142,7 @@
                         #}
                         {% if connection.backupFormatFloor == 'v2' %}
                             <p>
-                                {{ "This site may be asked to take a database backup. Each one is encrypted here and sealed to this organisation's own recovery keys — the platform holds no key that can open them."|t('manager-connector') }}
+                                {{ "This site may be asked to take a database backup. Each one is encrypted here and sealed to this organisation's own recovery keys - the platform holds no key that can open them."|t('manager-connector') }}
                             </p>
 
                             {#
@@ -153,7 +153,7 @@
                                 hijacked control-panel session that could re-pin this site would defeat
                                 the only control that makes the sentence above mean anything. The check
                                 matches on the setting names, so a pre-computed count passed under a
-                                different name would slip past it — which is the back door the invariant
+                                different name would slip past it - which is the back door the invariant
                                 exists to keep shut, and not a decision to take while fixing a display bug.
 
                                 An operator who wants to know reads config/manager-connector.php, which is
@@ -176,7 +176,7 @@
                                 This used to say "No backup will be taken until it does", as a flat
                                 statement of fact. It is not one. The floor is a ratchet raised only
                                 *after* a v2 backup succeeds, so every site reads v1 until its first
-                                one lands — including a correctly configured organisation whose
+                                one lands - including a correctly configured organisation whose
                                 platform holds recovery keys and has therefore never published an
                                 artifact key of its own, because under v2 it does not need one.
 
@@ -186,14 +186,14 @@
                                 configuration that is already correct.
 
                                 It now describes what is known rather than predicting what will
-                                happen. The distinction is the whole point — this site cannot tell
+                                happen. The distinction is the whole point - this site cannot tell
                                 which format it will be asked for until it is asked.
                             #}
                             <p class="light">
                                 {{ "This platform has published no artifact encryption key of its own. That is expected when your organisation uses recovery keys: backups are sealed to those instead, and this site will report which was used after its next backup."|t('manager-connector') }}
                             </p>
                             <p class="light">
-                                {{ "If your organisation has no recovery key either, no backup can be taken — an unencrypted database will never be uploaded. Create one in Manager to resolve it."|t('manager-connector') }}
+                                {{ "If your organisation has no recovery key either, no backup can be taken - an unencrypted database will never be uploaded. Create one in Manager to resolve it."|t('manager-connector') }}
                             </p>
                         {% endif %}
                     </td>

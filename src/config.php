@@ -15,7 +15,7 @@ return [
     // Drive the schedule from ordinary web traffic, for hosting with no cron. On by default.
     //
     // Each task fires at most once per interval however much traffic the site gets, and all a request
-    // does is push a queue job — the visitor waits for nothing. Turn it off if you have cron and would
+    // does is push a queue job - the visitor waits for nothing. Turn it off if you have cron and would
     // rather the schedule came from one place.
     //
     // It needs Craft's queue to actually run. That is Craft's default; if you have set
@@ -37,8 +37,8 @@ return [
     |
     | This is the most important setting here, and the easiest to skip. Backups are encrypted to keys
     | Manager names, because this site has to be told which keys your organisation holds and Manager
-    | is what tells it. That means a Manager installation that had been compromised — or that was
-    | compelled — could name a key of its own, and this site would encrypt to it. No error, no missing
+    | is what tells it. That means a Manager installation that had been compromised - or that was
+    | compelled - could name a key of its own, and this site would encrypt to it. No error, no missing
     | backup. Just a backup somebody else can read.
     |
     | Listing the fingerprints here closes that. They live on your server, in your version control,
@@ -46,7 +46,7 @@ return [
     | rather than being quietly skipped, and the check runs before the database is dumped.
     |
     | Get them from `manager-restore fingerprint recovery-key.pub`, or from the Manager settings
-    | screen — but note that comparing Manager's screen against Manager's own claim proves nothing.
+    | screen - but note that comparing Manager's screen against Manager's own claim proves nothing.
     | The file on your laptop is the reference.
     */
     // 'recoveryKeyFingerprints' => [
@@ -58,7 +58,7 @@ return [
     |
     | Off by default, and that is a compromise rather than a recommendation. On, this is strictly
     | safer. Off, a site that has been paired but not yet pinned still backs up, and Manager's own
-    | screen nags about it — which beats turning "we have not finished the setup" into "we have no
+    | screen nags about it - which beats turning "we have not finished the setup" into "we have no
     | backups", silently, on the day somebody needs one.
     |
     | Turn it on once your fleet is pinned.
@@ -72,7 +72,7 @@ return [
     |
     | Manager supplies a path and a query string; it never supplies a host, and there is no code path
     | by which it could. The URL is built as `https://` plus this value plus what it sent, which is
-    | stronger than checking a host it supplied — no host from Manager is used even as an input to a
+    | stronger than checking a host it supplied - no host from Manager is used even as an input to a
     | comparison.
     */
     // 'backupUploadHost' => '',

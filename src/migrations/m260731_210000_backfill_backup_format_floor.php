@@ -23,7 +23,7 @@ use craft\db\Migration;
  * from scratch has the migration recorded as applied and no column at all.
  *
  * The symptom is not a missing feature. `ConnectionRecord` resolves its attributes from the table, so
- * the first read raises `Getting unknown property: ...ConnectionRecord::backupFormatFloor` — which
+ * the first read raises `Getting unknown property: ...ConnectionRecord::backupFormatFloor` - which
  * reaches the backup path, where `BackupRunner` asks for the floor before deciding a format.
  *
  * `Install` now creates the column, which fixes the next fresh install but not the ones already out

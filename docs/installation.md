@@ -4,12 +4,12 @@
 
 - Craft CMS 4.4 or later, or Craft CMS 5.0 or later
 - PHP 8.1 or later
-  (Craft 4 itself runs on 8.0.2+, but this plugin does not — see the changelog for why)
+  (Craft 4 itself runs on 8.0.2+, but this plugin does not - see the changelog for why)
 - The `sodium` extension, which ships with PHP and is almost always already enabled
 - A Manager for Craft installation to report to
 
-That last one is either your own — [Manager Self-Hosted](https://github.com/Coysh-Digital/manager) is
-free and complete — or [Manager Cloud](https://managerforcraft.com), which is the same core hosted by
+That last one is either your own - [Manager Self-Hosted](https://github.com/Coysh-Digital/manager) is
+free and complete - or [Manager Cloud](https://managerforcraft.com), which is the same core hosted by
 Coysh Digital. This plugin is identical for both, so the choice is about who runs the server rather than
 what you get.
 
@@ -44,7 +44,7 @@ different Manager takes a deployment, which is the intended amount of friction. 
 pairing screen **cannot** be used to send this site's data somewhere else: when the address is
 configured, the form shows it as fixed rather than editable.
 
-If you cannot deploy a config file — managed hosting with no shell and no file access — leave it out
+If you cannot deploy a config file - managed hosting with no shell and no file access - leave it out
 and enter the address on the pairing screen instead. See [Pairing](/pairing).
 
 ## Then pair it
@@ -65,7 +65,7 @@ second needs no server access at all.
 
 ### If you cannot use cron
 
-Nothing to do — it is already on. `webTrigger` drives the schedule from ordinary web traffic: when a
+Nothing to do - it is already on. `webTrigger` drives the schedule from ordinary web traffic: when a
 task is due, the next request pushes a queue job and Craft's queue does the work. Each task fires at
 most once per interval however busy the site is.
 

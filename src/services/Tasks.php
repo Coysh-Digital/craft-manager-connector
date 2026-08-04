@@ -18,8 +18,8 @@ use RuntimeException;
 /**
  * The four things this connector does, in one place.
  *
- * They can be started from three directions — a console command, Craft's queue, or ordinary web traffic
- * when the schedule is due — and each needs the same work done. Holding the work here means the three
+ * They can be started from three directions - a console command, Craft's queue, or ordinary web traffic
+ * when the schedule is due - and each needs the same work done. Holding the work here means the three
  * cannot drift: a fix to what "report" means is a fix to all of them.
  *
  * Each method returns a short description of what happened, or throws. Nothing here writes to stdout or
@@ -105,8 +105,8 @@ class Tasks extends Component
      *
      * Returned, not thrown, and the distinction is the whole point of this method.
      *
-     * Being refused is the permission system working. Manager's own interface says as much — "a
-     * security rule whose capability is missing is skipped rather than passed" — and a site owner
+     * Being refused is the permission system working. Manager's own interface says as much - "a
+     * security rule whose capability is missing is skipped rather than passed" - and a site owner
      * who declines to report sign-in counters has made a choice, not a mistake. Throwing turned that
      * choice into a failed queue job every thirty minutes, in *their* control panel, from the plugin
      * that is supposed to be watching their site. The first evidence of this product many people

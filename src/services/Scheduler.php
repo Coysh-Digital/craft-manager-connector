@@ -21,7 +21,7 @@ use Throwable;
  * Runs the schedule from ordinary web traffic, for sites with no cron.
  *
  * Plenty of Craft sites live on hosting where nobody can add a cron entry. Requiring one would mean
- * this plugin simply does not work there, which is an exclusion rather than a limitation — so traffic
+ * this plugin simply does not work there, which is an exclusion rather than a limitation - so traffic
  * to the site drives the schedule instead.
  *
  * Three properties make that safe to have switched on:
@@ -35,7 +35,7 @@ use Throwable;
  *  - **The visitor waits for nothing.** All it does is push a queue job. The work happens in the queue.
  *
  * It is not a replacement for cron on a site that has cron. A quiet site reports less often, and a site
- * with no traffic overnight reports nothing overnight — Manager will notice the gap, correctly. Cron is
+ * with no traffic overnight reports nothing overnight - Manager will notice the gap, correctly. Cron is
  * more predictable and the documentation says so.
  */
 class Scheduler extends Component

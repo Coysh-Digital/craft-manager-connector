@@ -23,12 +23,12 @@ use RuntimeException;
  *
  * This is the single most important thing the connector does, and it is worth being precise about why.
  *
- * A backup is encrypted to keys the platform names. That is unavoidable — the site has to be told which
+ * A backup is encrypted to keys the platform names. That is unavoidable - the site has to be told which
  * keys the organisation holds, and the platform is what tells it. Sealing the artifact key to a
  * recovery key rather than to the platform's own therefore protects a customer against a platform whose
  * *storage* is stolen, and against a platform that is merely curious. It protects them against nothing
  * at all if the platform can choose the recipients, because a Manager installation that had been
- * compromised — or that was compelled — could name a key of its own, and this site would encrypt to it
+ * compromised - or that was compelled - could name a key of its own, and this site would encrypt to it
  * with nothing looking wrong from either end. No error, no warning, no missing backup. Just a backup
  * somebody else can read.
  *

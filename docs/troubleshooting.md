@@ -11,7 +11,7 @@ successful request was. Most questions are answered by it.
 
 ## "This site is not paired with a Manager platform"
 
-The plugin holds no identity. Either it was never paired, or something deleted the connection — a
+The plugin holds no identity. Either it was never paired, or something deleted the connection - a
 `disconnect`, or the plugin being uninstalled and reinstalled.
 
 Issue a fresh enrolment code in Manager and pair again. See [Pairing](/pairing).
@@ -42,7 +42,7 @@ than a plugin one.
 ## Paired, but nothing appears in Manager
 
 **Is anything running?** Nothing is reported unless something asks. Check that cron is actually running
-the commands — `manager-connector/status` shows the last successful request, and if that is "never" then
+the commands - `manager-connector/status` shows the last successful request, and if that is "never" then
 nothing has ever run.
 
 **Waiting for confirmation?** If the hostname this site reported differs from the domain Manager expected,
@@ -65,7 +65,7 @@ which is correct but slower than saying so.
 
 It redirects to **Utilities → Manager Connector**, which is where the screen lives. That is intended.
 
-If you get a redirect *loop*, you are on a version before 1.3.0 — upgrade.
+If you get a redirect *loop*, you are on a version before 1.3.0 - upgrade.
 
 ## The utility is not in the Utilities list
 
@@ -88,7 +88,7 @@ is never granted at pairing and needs its own confirmation.
 unexpectedly large dump fails early rather than filling the disk.
 
 **"the database is larger than the platform will accept."** A different limit from the one above, and
-not one you can change here — it belongs to the Manager installation you report to. Self-hosted, raise
+not one you can change here - it belongs to the Manager installation you report to. Self-hosted, raise
 `MANAGER_BACKUP_MAX_BYTES` there, or unset it for no ceiling; the refusal names the current one. On
 Manager Cloud the storage is metered and billed rather than capped, so this should not appear.
 
@@ -99,7 +99,7 @@ If it names a correlation ID, Manager refused it and wrote a line you can look u
 whoever runs the platform.
 
 If instead it says *no correlation ID was returned and the response was not JSON*, the request never
-reached Manager. A proxy or web server in front of it — nginx, Cloudflare, a load balancer — answered
+reached Manager. A proxy or web server in front of it - nginx, Cloudflare, a load balancer - answered
 with its own error page first, so there is nothing in the platform's log to find and the platform's
 own size ceiling is not the cause. The fix is on the platform host: `client_max_body_size` in nginx
 (**the default is 1 MB**, which rejects essentially every real backup) and `post_max_size` in PHP.
@@ -108,7 +108,7 @@ nights before anyone looked past the ceiling.
 
 **"there is not enough free disk to take a backup safely."** A backup holds the dump and the encrypted
 copy at once, so it needs about twice the dump. The message gives both numbers. Free space, or move
-Craft's backup directory to a volume that has it — the check runs before anything is written, so
+Craft's backup directory to a volume that has it - the check runs before anything is written, so
 nothing has been left behind.
 
 **"part N of M could not be uploaded."** Only on sites using a direct upload host, and only for
@@ -129,11 +129,11 @@ If that produces a payload, the plugin is working and the problem is between her
 errors, the error names what is wrong.
 
 Failing that, Craft's logs hold what the plugin recorded, under `storage/logs/`. Grep for
-`manager-connector`. Every message it writes is its own — no message contains a secret, an enrolment code
+`manager-connector`. Every message it writes is its own - no message contains a secret, an enrolment code
 or any site content, so a log is safe to send on if you need help reading it.
 
 ## Reporting a problem
 
 Bugs: [GitHub issues](https://github.com/Coysh-Digital/craft-manager-connector/issues).
 
-Security issues: privately to **hello@coysh.digital**, not a public issue.
+Security issues: privately to **support@managerforcraft.com**, not a public issue.

@@ -22,7 +22,7 @@ use Throwable;
  * Claims work from the platform and runs it.
  *
  * The important property is what this class *cannot* do. It holds a fixed map from job type to
- * handler method, and a type absent from that map is refused — reported back as failed, never
+ * handler method, and a type absent from that map is refused - reported back as failed, never
  * attempted. So a platform that has been compromised, or a response that has been tampered with,
  * cannot make this site do anything the site does not already implement.
  *
@@ -30,7 +30,7 @@ use Throwable;
  * *issue* an unknown type; this refuses to *execute* one. Two independent refusals, because they
  * protect against different failures.
  *
- * There is no dynamic dispatch here on purpose — no call to a method named by the payload, no
+ * There is no dynamic dispatch here on purpose - no call to a method named by the payload, no
  * callable resolved from a string. A match expression over known constants is harder to abuse than
  * any amount of validation around a variable method name.
  */
@@ -49,7 +49,7 @@ class JobRunner extends Component
         $response = $plugin->client->post('/api/connector/v1/jobs/claim', [], expectSigned: true);
 
         // The platform's current view of what this site may do. Adopted from a verified response, so
-        // the connector stays in step when a capability is granted or revoked — without it, the
+        // the connector stays in step when a capability is granted or revoked - without it, the
         // capability list would stay frozen at whatever pairing agreed, and granting one on the
         // platform would silently change nothing.
         if (isset($response['capabilities']) && is_array($response['capabilities'])) {
@@ -89,7 +89,7 @@ class JobRunner extends Component
         /*
          | Which declaration schemas this platform accepts, most preferred first.
          |
-         | Absent means a platform older than backup.v3, and the connector falls back to v2 — which is
+         | Absent means a platform older than backup.v3, and the connector falls back to v2 - which is
          | the whole reason this is advertised rather than assumed. A connector that simply started
          | sending v3 would break against every platform in the field until each one upgraded, and the
          | thing it would break is backups.
@@ -292,7 +292,7 @@ class JobRunner extends Component
             ], static fn(mixed $value): bool => $value !== null));
         } catch (Throwable $e) {
             // Reporting failed, not the job. Left unreported, the platform expires it after the
-            // definition's maximum runtime — which is the right outcome, and better than retrying
+            // definition's maximum runtime - which is the right outcome, and better than retrying
             // here and risking running the work twice.
             Craft::error(
                 'Manager Connector could not report a job result: ' . $e->getMessage(),

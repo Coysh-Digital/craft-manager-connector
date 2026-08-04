@@ -52,7 +52,7 @@ class Client extends Component
     public function pair(string $platformUrl, string $enrolmentCode, array $keypair): array
     {
         // Checked before anything is sent. Pairing is the one request that carries a bearer secret —
-        // the enrolment code — so it is the request that must not go out in the clear.
+        // the enrolment code - so it is the request that must not go out in the clear.
         $platformUrl = self::requireSecureUrl($platformUrl);
 
         $nonce = Nonce::generate();
@@ -74,14 +74,14 @@ class Client extends Component
              | The platform's own explanation, ahead of the correlation identifier.
              |
              | This called attribution() alone, so a refusal that arrived with a reason attached
-             | discarded it and printed a correlation identifier instead — the same fault that was
+             | discarded it and printed a correlation identifier instead - the same fault that was
              | fixed on the artifact path, on the one request where the person who needs the answer
              | is standing at a terminal watching it fail. They cannot look up a correlation
              | identifier; they do not have the platform yet.
              |
              | It matters most for a refusal that is asking for something back. A platform that
              | rejects the address this site typed can say which one to use instead, and that
-             | sentence is the whole remedy — printing "Correlation ID: unknown" in its place turns a
+             | sentence is the whole remedy - printing "Correlation ID: unknown" in its place turns a
              | one-line fix into a support question.
              |
              | reasonFrom() is the same fixed, platform-composed text it is everywhere else, and safe
@@ -214,7 +214,7 @@ class Client extends Component
      * Two things make this different from {@see self::post()}, and both matter.
      *
      * The signature covers a hash of the file declared in a header rather than a body held in memory.
-     * A database backup cannot be read into a string to be signed — on a site large enough to need
+     * A database backup cannot be read into a string to be signed - on a site large enough to need
      * managing, that is the request that exhausts PHP's memory limit.
      *
      * And the destination is not a parameter. It is `$record->platformUrl`, stored at pairing and
@@ -232,7 +232,7 @@ class Client extends Component
      * `config/manager-connector.php`, on this server, in the operator's own version control.
      *
      * That is stronger than accepting a host and checking it against an allow-list, because there is no
-     * comparison to get wrong — no value the platform sent is used even as an input to one. A
+     * comparison to get wrong - no value the platform sent is used even as an input to one. A
      * compromised platform can vary the path within a bucket the operator already approved, and can do
      * nothing else. A parameter named `url`, `host`, `endpoint`, `destination` or `bucket` on this
      * signature would undo it, and a build check fails if one appears.
@@ -240,8 +240,8 @@ class Client extends Component
      * Redirects are refused rather than followed. A 307 from a storage service is a perfectly ordinary
      * thing that would, here, relocate a customer's database to wherever the response said.
      *
-     * An artifact past a few gigabytes cannot go in one request — object stores cap a single PUT at
-     * five — so a grant may instead describe a sequence of parts. Each part is its own presigned
+     * An artifact past a few gigabytes cannot go in one request - object stores cap a single PUT at
+     * five - so a grant may instead describe a sequence of parts. Each part is its own presigned
      * request with its own path and query, assembled against the same configured host by the same one
      * line, and carrying a bounded slice of the file. Nothing about that changes what this method is
      * allowed to be told: a part carries a path and headers, never a host, and the store checks the
@@ -404,7 +404,7 @@ class Client extends Component
      * Send one presigned request carrying a bounded slice of a file.
      *
      * The slice is a `LimitStream` over the open handle rather than a string, so a part is never held
-     * in memory — which is the whole reason an artifact this large can be uploaded from a Craft
+     * in memory - which is the whole reason an artifact this large can be uploaded from a Craft
      * request at all.
      *
      * @param  array<string, string>  $headers
@@ -451,7 +451,7 @@ class Client extends Component
      *
      * A platform that wants direct uploads points that name at its bucket. One that does not simply
      * has no DNS there, its grants are refused at connect time, and {@see BackupRunner} falls back to
-     * uploading through the platform — which is what every site did before this existed.
+     * uploading through the platform - which is what every site did before this existed.
      *
      * Returns an empty string rather than guessing when the URL has no host. The caller refuses on
      * empty; a half-parsed URL must never become half a destination.
@@ -550,7 +550,7 @@ class Client extends Component
             }
         }
 
-        // Read once. The stream is consumed, so asking for it again returns nothing — and the raw
+        // Read once. The stream is consumed, so asking for it again returns nothing - and the raw
         // body is what tells a platform rejection apart from a proxy's error page.
         $raw = (string) $response->getBody();
         $decoded = $this->decode($raw);
@@ -582,7 +582,7 @@ class Client extends Component
      * is every inventory report that follows.
      *
      * Deliberately no escape hatch for local development. ddev, and every tunnelling service worth
-     * using, provide real certificates — so the only thing a bypass would enable is the mistake.
+     * using, provide real certificates - so the only thing a bypass would enable is the mistake.
      *
      * @throws RuntimeException
      */
@@ -646,12 +646,12 @@ class Client extends Component
     /**
      * Why the platform refused, when it said.
      *
-     * The rejection body carries a `reason`, and this used to throw it away — reporting a bare
+     * The rejection body carries a `reason`, and this used to throw it away - reporting a bare
      * status and a correlation identifier instead. That identifier is not always written down on the
      * platform side, so the one line a person had to go on named a record that did not exist, while
      * the actual explanation had arrived in the same response and been discarded.
      *
-     * Safe to print. These are fixed messages the platform composes about its own refusal — a quota,
+     * Safe to print. These are fixed messages the platform composes about its own refusal - a quota,
      * an unrecognised format, a limit, an address this site should have paired against instead —
      * never anything a site reported about its contents.
      *
@@ -677,12 +677,12 @@ class Client extends Component
      *
      *     The platform rejected the artifact (HTTP 413). Correlation ID: unknown
      *
-     * and the message sent everybody to the platform — to its size ceiling, its configuration, its
-     * log — when nginx in front of it was refusing a 2.1 MB body at `client_max_body_size 2m` and
+     * and the message sent everybody to the platform - to its size ceiling, its configuration, its
+     * log - when nginx in front of it was refusing a 2.1 MB body at `client_max_body_size 2m` and
      * the request had never reached PHP at all. The one clue that would have said so was in the
      * response the whole time: no identifier, and an HTML error page where JSON should have been.
      *
-     * `unknown` is kept for the case it actually describes — the platform answered, in JSON, and
+     * `unknown` is kept for the case it actually describes - the platform answered, in JSON, and
      * chose not to include one. Merging the two would trade a message that is unhelpful for a
      * message that is wrong.
      *
@@ -701,7 +701,7 @@ class Client extends Component
         // that is not a JSON object is not something this platform composed.
         if (!is_array(json_decode($body, true))) {
             return ' No correlation ID was returned and the response was not JSON, so a proxy or web '
-                . 'server in front of the platform refused this before it reached the application — '
+                . 'server in front of the platform refused this before it reached the application - '
                 . 'check the upload body size limit on the platform host. Nothing about this will '
                 . 'appear in the platform log.';
         }
@@ -714,8 +714,8 @@ class Client extends Component
      *
      * The body is preferred, because a rejection the platform composed deliberately puts it there.
      * The header is the fallback, and it is the case that matters: an *unhandled* failure on the
-     * platform produces a body this site's operator cannot rely on — Laravel's own error shape, with
-     * no correlation identifier in it — so the connector reported "Correlation ID: unknown" and left
+     * platform produces a body this site's operator cannot rely on - Laravel's own error shape, with
+     * no correlation identifier in it - so the connector reported "Correlation ID: unknown" and left
      * nobody anything to search for. That was the whole of what a site could say about a backup that
      * failed every time.
      *
