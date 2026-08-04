@@ -18,9 +18,20 @@ No inbound firewall rule is needed. The plugin only ever makes outbound HTTPS re
 ## Install with Composer
 
 ```bash
-composer require coysh-digital/craft-manager-connector
-php craft plugin/install manager-connector
+composer require "coysh-digital/craft-manager-connector:^1.12.1" -w && php craft plugin/install manager-connector
 ```
+
+The version is pinned so a site records which release it took, and quoted because `^` is a glob
+operator in zsh with `extendedglob` set and would be eaten before Composer saw it.
+
+`-w` is `--with-dependencies`: it lets Composer move this plugin's own dependencies rather than
+refusing because one is already locked. If Composer replies that a root requirement such as
+`craftcms/cms` is in the way, use `-W` (`--with-all-dependencies`) instead; it says so itself when
+that is the case.
+
+The `&&` matters. Run as two lines, `plugin/install` executes even when the require failed, and it
+then fails with a message about the plugin handle - which sends people looking at the handle rather
+than at the Composer error above it.
 
 ## Install from the Plugin Store
 
