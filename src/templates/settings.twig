@@ -44,13 +44,20 @@
             {# Prefilled with Manager Cloud, which is where most sites pair. It is a starting value and
                not a setting: the field stays editable, and a self-hosted installation replaces it with
                its own address. Sites that must not choose for themselves set `platformUrl` in
-               config/manager-connector.php, which locks the field entirely — the branch above. #}
+               config/manager-connector.php, which locks the field entirely — the branch above.
+
+               Cloud publishes a dedicated hostname for connector traffic rather than the address its
+               control panel is served from. A backup artifact is a single request carrying the whole
+               encrypted database, and the host a browser talks to is not necessarily configured to
+               accept one — an intermediary that refuses the body answers before the platform is
+               reached, which costs a site its backup and reports almost nothing about why. Pairing
+               against the published connector hostname is what keeps the two concerns separate. #}
             {{ forms.autosuggestField({
                 label: "Manager platform"|t('manager-connector'),
                 instructions: "The address of your Manager installation. Defaults to Manager Cloud; replace it if you self-host. Must be HTTPS — a signed request over plain HTTP is still readable in transit, including the code below. Check it carefully: this is where the site's operational state will be sent."|t('manager-connector'),
                 id: 'platformUrl',
                 name: 'platformUrl',
-                value: 'https://console.managerforcraft.com',
+                value: 'https://api.managerforcraft.com',
                 placeholder: 'https://manager.example.org',
                 suggestEnvVars: true,
                 required: true,
