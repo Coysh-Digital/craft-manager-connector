@@ -13,6 +13,7 @@ namespace coyshdigital\managerconnector\controllers;
 
 use coyshdigital\managerconnector\Plugin;
 use coyshdigital\managerconnector\records\ConnectionRecord;
+use coyshdigital\managerconnector\services\Client;
 use coyshdigital\managerconnector\utilities\ConnectorUtility;
 use Craft;
 use craft\web\Controller;
@@ -104,6 +105,11 @@ class EnrolController extends Controller
         $platformUrl = $configured !== ''
             ? $configured
             : trim((string) $request->getBodyParam('platformUrl', ''));
+
+        // Manager Cloud's control panel address is the one somebody has in their browser while they
+        // are fetching an enrolment code, so it is the one that gets pasted here — and it is not the
+        // address that will carry a backup. See Client::canonicalPlatformUrl().
+        $platformUrl = Client::canonicalPlatformUrl($platformUrl);
 
         if ($platformUrl === '') {
             $session->setError(Craft::t('manager-connector', 'Enter the address of your Manager platform.'));

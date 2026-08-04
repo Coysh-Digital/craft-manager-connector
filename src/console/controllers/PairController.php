@@ -12,6 +12,7 @@ declare(strict_types=1);
 namespace coyshdigital\managerconnector\console\controllers;
 
 use coyshdigital\managerconnector\records\ConnectionRecord;
+use coyshdigital\managerconnector\services\Client;
 use craft\helpers\Console;
 use Throwable;
 use yii\console\ExitCode;
@@ -40,7 +41,12 @@ class PairController extends BaseController
     public function actionIndex(string $enrolmentCode): int
     {
         $plugin = $this->plugin();
-        $platformUrl = $this->platformUrl ?? $plugin->getSettings()->platformUrl;
+
+        // Both pairing doors normalise the same way. Leaving it to the control panel alone would
+        // mean `--platform-url` and the settings screen disagreeing about where the same site pairs.
+        $platformUrl = Client::canonicalPlatformUrl(
+            $this->platformUrl ?? $plugin->getSettings()->platformUrl,
+        );
 
         if ($platformUrl === '') {
             $this->stderr("No platform URL configured.\n", Console::FG_RED);
