@@ -37,6 +37,23 @@ use Throwable;
 class Client extends Component
 {
     /**
+     * The Manager Cloud hostname a person reads a control panel on.
+     *
+     * Named only so that {@see self::canonicalPlatformUrl()} can recognise it when somebody pastes
+     * it into the pairing field. Nothing sends anything here.
+     */
+    private const CLOUD_CONSOLE_HOST = 'console.managerforcraft.com';
+
+    /**
+     * The Manager Cloud hostname connector traffic goes to.
+     *
+     * A backup is one request carrying an entire encrypted database. This is the address published
+     * to carry it; the console's is not, and an intermediary in front of it refuses a body that size
+     * before the platform is reached.
+     */
+    private const CLOUD_CONNECTOR_HOST = 'api.managerforcraft.com';
+
+    /**
      * Pair with a platform.
      *
      * The one unsigned request the connector ever makes, because at this point it has no identity
@@ -570,10 +587,6 @@ class Client extends Component
     }
 
     /**
-     * @param  array<string, string>  $headers
-     * @return array{status: int, body: string, headers: array<string, list<string>>}
-     */
-    /**
      * Refuse a platform URL that is not HTTPS.
      *
      * The specification is explicit that TLS remains mandatory and that signing does not replace it,
@@ -600,6 +613,44 @@ class Client extends Component
         return trim($platformUrl);
     }
 
+    /**
+     * The address a site should actually pair against, given the one somebody typed.
+     *
+     * Manager Cloud serves its control panel and its connector traffic on different hostnames, and
+     * only one of them will carry a backup. The control panel's is the address a person has in their
+     * browser when they go looking for an enrolment code, so it is the one they paste — and pasting
+     * it produced a site that paired cleanly, reported cleanly, and then failed every backup with a
+     * 413 raised by an intermediary, with no correlation identifier and nothing in the platform log.
+     *
+     * Rewriting it here is a deliberate exception to "the address is whatever the operator typed",
+     * and it is worth being precise about why it is a narrow one. The replacement is a constant in
+     * this file. **No value from any platform response reaches this decision**, which is the property
+     * invariant 8 protects — a compromised platform still cannot name a destination, because nothing
+     * it sends is consulted here or anywhere else on the way to a host.
+     *
+     * Matched on the parsed host rather than the whole string, because the string is arrived at by
+     * copying: `…/sites`, a trailing slash and a capital letter are all likelier than the bare origin,
+     * and an exact comparison would miss every one of them while looking like it worked.
+     *
+     * Anything else is returned untouched. A self-hosted installation is not addressed by this at all.
+     */
+    public static function canonicalPlatformUrl(string $platformUrl): string
+    {
+        $host = strtolower((string) parse_url(trim($platformUrl), PHP_URL_HOST));
+
+        if ($host !== self::CLOUD_CONSOLE_HOST) {
+            return trim($platformUrl);
+        }
+
+        // Scheme and host only. What was pasted may carry the path of whatever page it came from,
+        // and Client::send() appends its own path to this, so keeping one would build a nonsense URL.
+        return 'https://' . self::CLOUD_CONNECTOR_HOST;
+    }
+
+    /**
+     * @param  array<string, string>  $headers
+     * @return array{status: int, body: string, headers: array<string, list<string>>}
+     */
     private function send(string $platformUrl, string $path, string $body, array $headers): array
     {
         $settings = Plugin::getInstance()->getSettings();
