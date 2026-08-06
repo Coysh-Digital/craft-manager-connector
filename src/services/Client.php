@@ -537,6 +537,20 @@ class Client extends Component
                 'timeout' => $settings->uploadTimeout,
                 'connect_timeout' => $settings->timeout,
                 'http_errors' => false,
+
+                // The same two the direct-upload client sets, and they were missing here.
+                //
+                // They arrived with the direct-upload path, where the reasoning is written out: a
+                // storage service answering with a redirect must not be able to send a customer's
+                // database somewhere else, and a "disable certificate checking" option exists to be
+                // switched on during a support call and left on. Both arguments are about this
+                // request too - it carries the same artifact - and neither was applied to it.
+                //
+                // Guzzle follows redirects by default, so this was not a hardening nicety: a 302 in
+                // front of the platform would have re-sent the whole encrypted artifact wherever it
+                // pointed, with the site's signature attached.
+                'allow_redirects' => false,
+                'verify' => true,
             ]);
 
             $response = $client->put(rtrim(self::requireSecureUrl($record->platformUrl), '/') . $path, [
@@ -662,6 +676,16 @@ class Client extends Component
             // A non-2xx response is information, not an exception: the platform's rejections carry
             // a correlation ID that an operator needs.
             'http_errors' => false,
+
+            // Every request this connector makes, not only the ones carrying a backup. A redirect
+            // followed here would re-send a signed request - inventory, findings, a job result - to
+            // wherever it pointed, and the signature would travel with it.
+            'allow_redirects' => false,
+
+            // Stated rather than left to Guzzle's default, which is the same value. The default is
+            // not the point: Craft::createGuzzleClient merges config/guzzle.php, so an installation
+            // that turned verification off globally would turn it off here too, silently.
+            'verify' => true,
         ]);
 
         try {

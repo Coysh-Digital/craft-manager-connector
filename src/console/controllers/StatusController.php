@@ -40,7 +40,9 @@ class StatusController extends BaseController
         $this->stdout('  Site identifier:   ' . $connection->siteIdentifier . "\n");
         $this->stdout('  Capabilities:      ' . (implode(', ', $plugin->connection->capabilities()) ?: 'none') . "\n");
         $this->stdout('  Last success:      ' . ($connection->lastSuccessAt ?? 'never') . "\n");
-        $this->stdout('  Key rotated:       ' . ($connection->keyRotatedAt ?? 'never') . "\n");
+        // Same relabelling as the control-panel screen: this is written at pairing and nothing
+        // rotates it, so "rotated" described a schedule nobody is keeping.
+        $this->stdout('  Signing key made:  ' . ($connection->keyRotatedAt ?? 'never') . "\n");
         $this->stdout('  Connector version: ' . Plugin::VERSION . "\n");
 
         return ExitCode::OK;

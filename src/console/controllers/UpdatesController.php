@@ -20,9 +20,15 @@ use yii\console\ExitCode;
  *
  * Checks for available Craft and plugin updates and reports what is available.
  *
- * Reports whether an update exists and whether any release in between is flagged critical. It does
- * not send release notes: those describe what a version fixes, and forwarding them would put a
- * description of an unpatched vulnerability, attached to this site, into a dashboard.
+ * Reports whether an update exists, whether any release in between is flagged critical, and the
+ * release notes themselves - bounded per note and across the report. See UpdatesReporter, which
+ * holds the reasoning and the limits.
+ *
+ * This block used to say notes were never sent, on the grounds that forwarding one would put a
+ * description of an unpatched vulnerability, attached to this site, into a dashboard. That argument
+ * was reconsidered where the code lives rather than here: the notes are public, and what is not
+ * public is the pairing of a note with a named site - which the platform already knows, because it
+ * is being told the version. The comment stayed behind after the code moved on.
  */
 class UpdatesController extends BaseController
 {

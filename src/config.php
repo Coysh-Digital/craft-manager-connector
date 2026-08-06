@@ -68,7 +68,16 @@ return [
     /*
     | Host to upload backup artifacts to when Manager issues a direct upload grant.
     |
-    | Empty disables direct uploads entirely and sends artifacts through Manager, as before.
+    | Optional. Left unset, the host is derived as `uploads.` in front of the platform host you typed
+    | at pairing - so a direct upload grant is honoured without this line, and the destination is
+    | still something this site worked out rather than something Manager sent.
+    |
+    | This used to say an empty value disabled direct uploads and sent artifacts through Manager.
+    | That stopped being true when the derivation was added, and it is the kind of stale sentence
+    | worth correcting loudly: an operator reading it would believe artifacts went nowhere but the
+    | platform, and choose not to set a value on that basis.
+    |
+    | Set it to point a fleet at your own bucket. A value here always wins over the derived one.
     |
     | Manager supplies a path and a query string; it never supplies a host, and there is no code path
     | by which it could. The URL is built as `https://` plus this value plus what it sent, which is
