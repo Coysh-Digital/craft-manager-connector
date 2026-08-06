@@ -267,13 +267,29 @@ if (! str_contains($client, '$record->platformUrl')) {
     $failures[] = 'src/services/Client.php no longer sends uploads to the paired platform URL; check where they go instead (invariants 4, 5 and 8).';
 }
 
-// putFile takes a path on this server and a hash, and nothing that names a destination host.
-if (preg_match('/function putFile\((.*?)\)/s', $client, $signature) !== 1) {
-    $failures[] = 'src/services/Client.php no longer defines putFile(); the artifact upload path has changed.';
-} else {
+/*
+ | Every method that puts artifact bytes on the wire takes a path on this server and a hash, and
+ | nothing that names a destination host.
+ |
+ | A list rather than one name, because this check found its own gap. It matched `putFile(` alone,
+ | and an artifact can now leave this site through three methods - the whole-file upload, the
+ | part-by-part one, and the request both of them go through. Two of those would have been entirely
+ | unchecked, which is to say the new upload path would have been the one with no rule on it.
+ |
+ | Add to this list when a fourth appears. The comment above it says the check exists so that anybody
+ | adding a destination argument for convenience has to come and read it; a method the check does not
+ | know about is how that stops being true quietly.
+ */
+foreach (['putFile', 'putFileInParts', 'putArtifactBytes'] as $method) {
+    if (preg_match('/function '.$method.'\((.*?)\)/s', $client, $signature) !== 1) {
+        $failures[] = "src/services/Client.php no longer defines {$method}(); the artifact upload path has changed.";
+
+        continue;
+    }
+
     foreach (['url', 'host', 'endpoint', 'destination', 'bucket'] as $forbidden) {
         if (stripos($signature[1], $forbidden) !== false) {
-            $failures[] = "src/services/Client.php putFile() accepts a '{$forbidden}' argument; an artifact destination must never be a parameter (invariant 8).";
+            $failures[] = "src/services/Client.php {$method}() accepts a '{$forbidden}' argument; an artifact destination must never be a parameter (invariant 8).";
         }
     }
 }

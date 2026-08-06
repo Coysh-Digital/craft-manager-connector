@@ -1,12 +1,72 @@
 # Changelog
 
-## 1.12.2 - 2026-08-06
+## 1.13.0 - 2026-08-07
+
+A backup no longer travels as one enormous request, which is the difference between a large database
+being backed up and not.
+
+Also carried here, unchanged and never released: the two defects and four false statements that were
+written up under 1.12.2. **That heading has been renamed rather than added to.** 1.12.2 was never
+tagged, so it has reached nobody, and a patch number describing a new upload path would not have been
+a number anybody could honestly tag - which is the one property the version rule exists to keep. Its
+entry is the last section below, as it stood.
+
+### A backup now reaches the *platform* in parts, not just an object store
+
+1.11.0 taught this plugin to upload a large artifact as a sequence of presigned parts, but only on the
+direct-to-storage path - the one that needs a bucket the operator has pointed DNS at. Every site
+without one, which is most of them and every self-hosted installation, still sent the whole artifact
+to the platform in a single request. This is that same idea applied to the path almost everybody
+actually uses.
+
+The artifact itself does not change. Same encryption, same manifest, same signature, same file
+`manager-restore` opens, same bytes in storage. What changes is that this site sends it in bounded
+pieces and then asks the platform to put them together, instead of holding one request open for as
+long as a customer's database takes to travel.
+
+That request was the problem, and the failure it produced was hard to read. A site was refused with
+
+    The platform rejected the artifact (HTTP 502)
+
+which is not a refusal at all - it means a web server or PHP process on the platform host stopped
+answering while the body was still arriving. It is a timeout rather than a size limit, and it cannot
+be fixed from the platform's application code either: php-fpm's `request_terminate_timeout` ends the
+process from outside PHP. A request carrying a few megabytes never reaches it, whatever the size of
+the database.
+
+**Each part is retried on its own.** A connection dropped near the end of a twenty-gigabyte upload
+now costs that part rather than the whole transfer, and if this site loses track of where it was, the
+platform answers with the part to continue from instead of a bare refusal. Parts are sent one at a
+time and never in parallel - this runs on somebody's production server, and saturating their uplink
+to finish sooner is not this plugin's decision to make.
+
+**Nothing has to be upgraded in step.** The platform says whether it accepts parts, per artifact, and
+a platform too old to say so receives the whole file in one request exactly as before. Requires
+Manager 1.3.0 or later on the platform side to take effect; against anything older this version
+behaves identically to 1.12.x.
+
+### Fixed
+
+- **A 502 no longer sends you to look at the body size limit.** The message that explains an error
+  page from something in front of the platform said "check the upload body size limit" whatever the
+  status was. That is right for a 413 and wrong for a 502, which is a timeout in a different setting
+  in a different file - and telling somebody to check the wrong one costs as much as telling them
+  nothing. The two now read differently.
+
+- **The queue reservation would have become the new wall.** `uploadTimeout` used to bound a whole
+  upload, so the reservation derived from it was never reached - Guzzle ended the transfer first. It
+  is now a per-request budget, which makes an upload of several hours possible for the first time, at
+  which point a backup would have died partway through with the queue starting a second dump of a
+  production database. The reservation is now at least six hours, matching the window a platform
+  gives a declared artifact to arrive.
+
+### Everything below was written up as 1.12.2, and ships here instead
 
 Two defects in code that runs inside customers' production Craft sites, four statements this plugin
 made about itself that had stopped being true - and the pairing fix that 1.12.1's notes described
-but 1.12.1 does not contain.
+but 1.12.1 does not contain. All of it is unchanged; only the number it arrives under has moved.
 
-### First, a correction to 1.12.1
+#### First, a correction to 1.12.1
 
 **The tag published as 1.12.1 does not include "A control panel's address is not necessarily an
 upload address", which its own release notes below credit it with.** The release commit that bumped
@@ -22,7 +82,7 @@ section naming it. What stops a repeat is procedural rather than automated - the
 notes now move in the same pull request as the code, so there is no window in which they can be in
 different commits.
 
-### A failed encryption left an encrypted copy of the database on disk
+#### A failed encryption left an encrypted copy of the database on disk
 
 Two paths, one cause. The caller's `finally` shreds the dump and whatever the method *returns*, so a
 throw inside it returns nothing and the temporaries survive: a throw during encryption left the
@@ -40,7 +100,7 @@ in the caller - which is correct for the case it covers and cannot see inside a 
 look for orphaned `.stream` and `.artifact` files in the connector's temporary directory; they are
 encrypted, so they are not a disclosure, but they are occupying space nothing will reclaim.
 
-### Two of three HTTP clients followed redirects
+#### Two of three HTTP clients followed redirects
 
 The direct-upload path sets `allow_redirects => false` and `verify => true`, with the reasoning
 written out beside them: a storage service answering with a redirect must not send a customer's
@@ -56,7 +116,7 @@ signature attached.
 `config/guzzle.php` - so an installation that turned certificate verification off globally turned it
 off here too, silently.
 
-### Four statements corrected
+#### Four statements corrected
 
 - `config.php` said an empty `backupUploadHost` disabled direct uploads and sent artifacts through
   Manager. It has derived `uploads.<platform-host>` since the derivation was added, so an operator
@@ -70,7 +130,7 @@ off here too, silently.
   reads as a key being cycled. It is now "Signing key generated", and says that re-pairing replaces
   it.
 
-### The version is now checked in four places rather than two
+#### The version is now checked in four places rather than two
 
 `bin/verify-invariants.php` already compared `composer.json` against `Plugin::VERSION`, because those
 two had drifted once and Packagist published nothing at all as a result. Since 1.12.1 the version is
@@ -81,7 +141,7 @@ All four are now checked, along with the top heading of this file. A stale insta
 worse failure than a stale manifest: it is the line somebody pastes into a production site, and it
 silently installs the version before the fix they came for.
 
-### Also in here
+#### Also in here
 
 Advisories are scanned on a schedule rather than only when somebody opens a pull request; the install
 command in both documentation files is pinned and each of its flags explained; and typographic

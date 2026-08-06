@@ -247,15 +247,42 @@ class BackupRunner extends Component
                 }
             }
 
-            $result = $uploadedDirect
+            /*
+             | How large a piece of the artifact the platform wants at a time, when it wants pieces.
+             |
+             | A size and never a place, which is the only reason it can be read from a platform
+             | response at all. It is the same category as `max_artifact_bytes` on the claim: a number
+             | that can only ever make this site send *smaller* requests, with nowhere to put a
+             | destination even if somebody wanted one there.
+             |
+             | Absent means a platform too old to accept parts, and then this sends the whole artifact
+             | in one request exactly as every connector before this did. Nothing has to be upgraded
+             | in step in either direction.
+             */
+            $partBytes = (int) ($declared['ingest_part_bytes'] ?? 0);
+
+            $contentPath = "/api/connector/v1/backups/{$artifactId}/content";
+            $contentHash = $useV2 ? $encrypted['artifact_sha256'] : $encrypted['ciphertext_sha256'];
+
+            if ($uploadedDirect) {
                 // The platform did not see these bytes, so it goes and asks storage rather than taking
                 // this site's word for it. Nothing is reported here but the fact of having finished.
-                ? $plugin->client->post("/api/connector/v1/backups/{$artifactId}/uploaded", [])
-                : $plugin->client->putFile(
-                    "/api/connector/v1/backups/{$artifactId}/content",
-                    $encrypted['path'],
-                    $useV2 ? $encrypted['artifact_sha256'] : $encrypted['ciphertext_sha256'],
-                );
+                $result = $plugin->client->post("/api/connector/v1/backups/{$artifactId}/uploaded", []);
+            } elseif ($partBytes > 0) {
+                /*
+                 | In pieces, then a request asking the platform to put them together.
+                 |
+                 | Distinct from `uploaded` above and deliberately not the same endpoint. That one says
+                 | "you never saw these bytes, go and ask storage"; this says the opposite - the
+                 | platform is holding all of them and can check them itself against the checksum in
+                 | the manifest this site signed.
+                */
+                $plugin->client->putFileInParts($contentPath, $encrypted['path'], $partBytes);
+
+                $result = $plugin->client->post("/api/connector/v1/backups/{$artifactId}/assembled", []);
+            } else {
+                $result = $plugin->client->putFile($contentPath, $encrypted['path'], $contentHash);
+            }
 
             Craft::info(
                 "Manager Connector uploaded a backup artifact ({$encrypted['ciphertext_bytes']} bytes).",
