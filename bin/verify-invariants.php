@@ -470,6 +470,17 @@ foreach (['recoveryKeyFingerprints', 'requirePinnedRecoveryKeys', 'backupUploadH
 // This check exists because those drifted: the constant went to 1.2.0 and composer.json stayed at
 // 1.1.0, so Packagist saw a tag that disagreed with the manifest and published nothing at all. The
 // failure was silent from here and only visible as a package with no versions.
+//
+// It is now five places rather than two. 1.12.1 pinned the version into the documented install command
+// in README.md and docs/installation.md, and the commit that did it wrote down that nothing would bump
+// them; the changelog's top heading is the fifth. Each is a real failure mode and they are not the same
+// one:
+//
+//   - a stale manifest publishes nothing, loudly enough to notice eventually;
+//   - a stale install command publishes fine and installs the version *before* the fix somebody came
+//     for, into a production site, from a line they pasted rather than read;
+//   - a changelog heading that does not match is how a release ships notes for a change it does not
+//     contain, which is what happened to 1.12.1.
 $checks++;
 
 $pluginSource = sourceWithoutComments($sourceDir.'/Plugin.php');
@@ -477,14 +488,57 @@ $pluginSource = sourceWithoutComments($sourceDir.'/Plugin.php');
 if (preg_match("/const VERSION = '([^']+)'/", $pluginSource, $constant) !== 1) {
     $failures[] = 'src/Plugin.php no longer declares a VERSION constant.';
 } else {
+    $version = $constant[1];
     $declared = $manifest['version'] ?? null;
 
     if ($declared === null) {
-        $failures[] = 'composer.json has no version field, but Plugin::VERSION is '.$constant[1]
+        $failures[] = 'composer.json has no version field, but Plugin::VERSION is '.$version
             .'. Either both state the version or neither does.';
-    } elseif ($declared !== $constant[1]) {
-        $failures[] = "composer.json says version {$declared} but Plugin::VERSION is {$constant[1]}. "
+    } elseif ($declared !== $version) {
+        $failures[] = "composer.json says version {$declared} but Plugin::VERSION is {$version}. "
             .'A release with two different version numbers is not a verifiable one (invariant 17).';
+    }
+
+    // The install command, wherever it is documented. Matched on the package name rather than on the
+    // surrounding line, so moving the command or changing its flags does not quietly stop it being
+    // checked - which is how it came to be unchecked in the first place.
+    foreach (['README.md', 'docs/installation.md'] as $documentation) {
+        $path = $root.'/'.$documentation;
+
+        if (! is_file($path)) {
+            $failures[] = "{$documentation} is missing; it documents the install command and the version pinned in it.";
+
+            continue;
+        }
+
+        $prose = (string) file_get_contents($path);
+
+        if (preg_match_all('/coysh-digital\/craft-manager-connector:\^?([0-9]+\.[0-9]+\.[0-9]+)/', $prose, $pinned) === false
+            || $pinned[1] === []) {
+            $failures[] = "{$documentation} no longer pins a version in the install command. It should read "
+                .'coysh-digital/craft-manager-connector:^'.$version.'.';
+
+            continue;
+        }
+
+        foreach (array_unique($pinned[1]) as $pin) {
+            if ($pin !== $version) {
+                $failures[] = "{$documentation} tells somebody to install ^{$pin} but this release is {$version}. "
+                    .'That command is pasted into production sites and would install the version before this one.';
+            }
+        }
+    }
+
+    // The changelog's top heading. Only that it exists and matches - what it says underneath is a
+    // human's job, and a check that tried to judge prose would be one people phrase around.
+    $changelog = is_file($root.'/CHANGELOG.md') ? (string) file_get_contents($root.'/CHANGELOG.md') : '';
+
+    if (preg_match('/^## +([0-9]+\.[0-9]+\.[0-9]+)/m', $changelog, $heading) !== 1) {
+        $failures[] = 'CHANGELOG.md has no version heading. Every release states what changed in it.';
+    } elseif ($heading[1] !== $version) {
+        $failures[] = "CHANGELOG.md's top entry is {$heading[1]} but this release is {$version}. "
+            .'Bump the version and write its entry in the same commit as the change - 1.12.1 shipped '
+            .'notes for a fix it did not contain because those were two commits.';
     }
 }
 
