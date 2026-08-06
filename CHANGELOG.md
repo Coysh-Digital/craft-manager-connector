@@ -1,5 +1,93 @@
 # Changelog
 
+## 1.12.2 - 2026-08-06
+
+Two defects in code that runs inside customers' production Craft sites, four statements this plugin
+made about itself that had stopped being true - and the pairing fix that 1.12.1's notes described
+but 1.12.1 does not contain.
+
+### First, a correction to 1.12.1
+
+**The tag published as 1.12.1 does not include "A control panel's address is not necessarily an
+upload address", which its own release notes below credit it with.** The release commit that bumped
+the version and wrote those notes went in on 4 August; the code merged the next day, behind it. A tag
+cannot be changed, so 1.12.1 stays as published and the fix arrives here instead.
+
+If you are on 1.12.1 and pairing prefilled a control-panel hostname, this is the version that fixes
+it. The notes for it are unchanged and are still below, because they describe the change accurately -
+only the version they sit under was wrong.
+
+Nothing warned about this and nothing would have: no check compares a tag against the changelog
+section naming it. What stops a repeat is procedural rather than automated - the version and its
+notes now move in the same pull request as the code, so there is no window in which they can be in
+different commits.
+
+### A failed encryption left an encrypted copy of the database on disk
+
+Two paths, one cause. The caller's `finally` shreds the dump and whatever the method *returns*, so a
+throw inside it returns nothing and the temporaries survive: a throw during encryption left the
+`.stream`, a complete encrypted copy with no manifest, and a throw during envelope assembly left a
+partial `.artifact`.
+
+The likeliest cause is what makes it worst. Both fail part-way when the disk fills, so every retry
+added another encrypted copy to a disk that was already full, until nothing could be written at all
+and the site had neither backups nor space. Both now go with the exception.
+
+`bin/verify-invariants.php` asserts this cleanup and passed throughout, because it matches the shape
+in the caller - which is correct for the case it covers and cannot see inside a method that throws.
+
+**There is nothing to clean up by hand unless a backup has already failed this way.** If one has,
+look for orphaned `.stream` and `.artifact` files in the connector's temporary directory; they are
+encrypted, so they are not a disclosure, but they are occupying space nothing will reclaim.
+
+### Two of three HTTP clients followed redirects
+
+The direct-upload path sets `allow_redirects => false` and `verify => true`, with the reasoning
+written out beside them: a storage service answering with a redirect must not send a customer's
+database somewhere else, and a "disable certificate checking" option exists to be switched on during
+a support call and left on.
+
+Neither was applied to `putFile()`, which uploads the same artifact through the platform, nor to
+`send()`, which makes every other signed request. Guzzle follows redirects by default, so a 302 in
+front of the platform would have re-sent the whole artifact wherever it pointed, with the site's
+signature attached.
+
+`verify` is now stated rather than left to the default, because `Craft::createGuzzleClient` merges
+`config/guzzle.php` - so an installation that turned certificate verification off globally turned it
+off here too, silently.
+
+### Four statements corrected
+
+- `config.php` said an empty `backupUploadHost` disabled direct uploads and sent artifacts through
+  Manager. It has derived `uploads.<platform-host>` since the derivation was added, so an operator
+  reading it would decline to set a value believing artifacts went nowhere but the platform.
+- The control-panel screen said backups go "to the platform this site is paired with and nowhere
+  else". The half that matters is still true and now says only that: where the artifact goes is
+  decided here, and no instruction from the platform can change it.
+- `UpdatesController` said release notes are never sent. They are, bounded per note and across the
+  report.
+- "Credentials rotated" showed the pairing date beside a keypair with no rotation mechanism, which
+  reads as a key being cycled. It is now "Signing key generated", and says that re-pairing replaces
+  it.
+
+### The version is now checked in four places rather than two
+
+`bin/verify-invariants.php` already compared `composer.json` against `Plugin::VERSION`, because those
+two had drifted once and Packagist published nothing at all as a result. Since 1.12.1 the version is
+also written into `README.md` and `docs/installation.md`, as the pinned constraint in the documented
+install command, and nothing was comparing those - the commit that added them said so and left it.
+
+All four are now checked, along with the top heading of this file. A stale install command is a
+worse failure than a stale manifest: it is the line somebody pastes into a production site, and it
+silently installs the version before the fix they came for.
+
+### Also in here
+
+Advisories are scanned on a schedule rather than only when somebody opens a pull request; the install
+command in both documentation files is pinned and each of its flags explained; and typographic
+punctuation across prose is now plain ASCII, which touched no identifier and no value that crosses a
+wire.
+
 ## 1.12.1
 
 Pairing points at the hostname a backup can actually travel to, and says so when it is refused.
