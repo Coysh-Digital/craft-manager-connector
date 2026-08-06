@@ -1,0 +1,51 @@
+name: Advisories
+
+# The dependency audit already runs on every pull request. This is the schedule, and the difference
+# is the whole point of the file: an advisory is published when it is published, not when somebody
+# next happens to open a pull request. A library nobody has touched for a month was a month behind
+# on knowing.
+#
+# Deliberately its own workflow rather than a `schedule:` on ci.yml, which would run the whole
+# matrix weekly to answer a question that needs none of it - and a red run would then mean any of
+# several things. This job fails for exactly one reason.
+#
+# GitHub emails the repository owner when a scheduled workflow fails, which is the alerting
+# mechanism; nothing else needs configuring.
+
+on:
+  schedule:
+    # Monday morning, UTC. Early enough in the week that acting on it is not a Friday job.
+    - cron: '0 7 * * 1'
+
+  # So it can be run by hand while investigating, without waiting for Monday.
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Actions pinned to the commit behind a release rather than to a tag. A tag can be moved; a commit
+# cannot. ci.yml in this repository still uses moving tags - that is worth correcting separately,
+# and a new file should not add to it.
+
+jobs:
+  advisories:
+    name: Dependency advisories
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # 2.37.2
+        with:
+          php-version: '8.2'
+          coverage: none
+
+      # This package commits no composer.lock - it is a library, so a consumer's lockfile decides.
+      # `composer install` therefore resolves fresh and writes one, which is what `--locked` then
+      # reads, and it means this checks the newest versions the constraints admit rather than a
+      # snapshot taken whenever the file was last committed.
+      - name: Install dependencies
+        run: composer install --no-interaction --no-progress --prefer-dist --no-scripts
+
+      - name: PHP advisories
+        run: composer audit --locked
