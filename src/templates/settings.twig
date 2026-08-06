@@ -160,14 +160,14 @@
                                 in their own version control and is the authority either way.
                             #}
                             <p class="light">
-                                {{ "The plaintext dump is deleted as soon as it has been encrypted. Backups are uploaded to the platform this site is paired with and nowhere else; no instruction from the platform can change where they go."|t('manager-connector') }}
+                                {{ "The plaintext dump is deleted as soon as it has been encrypted. Where the artifact goes is decided here, from the address you paired with - no instruction from the platform can change it."|t('manager-connector') }}
                             </p>
                         {% elseif connection.platformBackupPublicKey %}
                             <p>
                                 {{ "This site may be asked to take a database backup. Each one is encrypted here, with a key generated on this server and sealed to the platform, before it is uploaded."|t('manager-connector') }}
                             </p>
                             <p class="light">
-                                {{ "The plaintext dump is deleted as soon as it has been encrypted. Backups are uploaded to the platform this site is paired with and nowhere else; no instruction from the platform can change where they go."|t('manager-connector') }}
+                                {{ "The plaintext dump is deleted as soon as it has been encrypted. Where the artifact goes is decided here, from the address you paired with - no instruction from the platform can change it."|t('manager-connector') }}
                             </p>
                         {% else %}
                             {#
@@ -207,9 +207,23 @@
                 <th scope="row">{{ "Connector version"|t('manager-connector') }}</th>
                 <td><code>{{ connectorVersion }}</code></td>
             </tr>
+            {#
+               Labelled for what the value is rather than for what the column was called.
+
+               `keyRotatedAt` is written in exactly one place - pairing - and nothing rotates it
+               afterwards, because this site's signing keypair has no rotation mechanism. So the row
+               said "Credentials rotated" beside the pairing date, which reads as a key that is being
+               cycled and is not.
+
+               Re-pairing is the rotation: it generates a fresh keypair and this date moves. Saying
+               so is more useful than a word that implies a schedule nobody is keeping.
+            #}
             <tr>
-                <th scope="row">{{ "Credentials rotated"|t('manager-connector') }}</th>
-                <td>{{ connection.keyRotatedAt ? connection.keyRotatedAt|datetime('short') : "Never"|t('manager-connector') }}</td>
+                <th scope="row">{{ "Signing key generated"|t('manager-connector') }}</th>
+                <td>
+                    {{ connection.keyRotatedAt ? connection.keyRotatedAt|datetime('short') : "Never"|t('manager-connector') }}
+                    <span class="light">{{ "- re-pair this site to replace it"|t('manager-connector') }}</span>
+                </td>
             </tr>
             <tr>
                 <th scope="row">{{ "Disconnect"|t('manager-connector') }}</th>

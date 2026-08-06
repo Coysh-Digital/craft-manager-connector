@@ -379,6 +379,27 @@ class BackupRunner extends Component
             } finally {
                 sodium_memzero($secret);
             }
+        } catch (Throwable $e) {
+            /*
+             | The `.stream` goes with the exception, and this is the case that was missing.
+             |
+             | Everything above writes a complete encrypted copy of the database to `$streamPath`.
+             | Until now a throw here left it there: the caller's `finally` shreds the dump and the
+             | finished artifact, and it never learns about this file because the method that names
+             | it did not return.
+             |
+             | The likeliest cause is the one that makes it worst. Encryption fails part-way when the
+             | disk fills, so every retry left another encrypted copy of the database on a disk that
+             | was already full - until the next attempt could not write at all, and the site was out
+             | of both backups and space.
+            */
+            if (is_resource($stream)) {
+                fclose($stream);
+            }
+
+            $this->shred($streamPath);
+
+            throw $e;
         } finally {
             sodium_memzero($key);
 
@@ -418,9 +439,21 @@ class BackupRunner extends Component
 
             rewind($stream);
             stream_copy_to_stream($stream, $output);
+        } catch (Throwable $e) {
+            // A half-written artifact goes too. The caller's finally shreds what this method
+            // *returns*, and a throw here returns nothing - so without this the partial file stayed,
+            // and the disk-full case that caused it made every retry add another one.
+            $this->shred($target);
+
+            throw $e;
         } finally {
-            fclose($stream);
-            fclose($output);
+            if (is_resource($stream)) {
+                fclose($stream);
+            }
+
+            if (is_resource($output)) {
+                fclose($output);
+            }
 
             // The bare stream has served its purpose the moment the envelope is assembled around it,
             // and it is a complete encrypted copy of the database with no manifest to explain it.
