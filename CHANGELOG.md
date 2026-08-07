@@ -1,5 +1,30 @@
 # Changelog
 
+## 1.13.1 - 2026-08-07
+
+One request in 1.13.0 was given ten seconds to do a job measured in gigabytes.
+
+### Asking the platform to assemble an artifact no longer times out at ten seconds
+
+`POST .../assembled` went out on the ordinary request budget, which is right for a heartbeat and
+wrong for this: the platform hashes the whole reassembled artifact against the checksum in the
+manifest this site signed before it answers, and on anything past a few hundred megabytes that takes
+longer than ten seconds. It now uses `uploadTimeout`, the same budget the parts themselves get.
+`connect_timeout` is unchanged and still short - a platform that will not answer the socket must
+never become a slow website.
+
+**The failure was worse than a slow request, which is why this is worth upgrading for.** The
+connector gave up, reported the job failed, and the platform then settled the artifact as failed and
+deleted the parts - while its own assembly was still running and about to store them. A backup that
+had uploaded correctly was thrown away by the side that had already finished it. Reported live as
+
+    cURL error 28: Operation timed out after 10003 milliseconds with 0 bytes received
+
+alongside a `No such file or directory` in the platform's log naming the staging file the connector
+had just caused it to delete.
+
+Sites on a platform older than Manager 1.3.0 never reach this path and are unaffected.
+
 ## 1.13.0 - 2026-08-07
 
 A backup no longer travels as one enormous request, which is the difference between a large database

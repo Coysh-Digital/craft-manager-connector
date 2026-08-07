@@ -140,11 +140,22 @@ class Client extends Component
     /**
      * Send a signed request as this site.
      *
+     * `$patient` is for the one request that carries nothing and takes a long time: asking the
+     * platform to assemble an artifact it has received in parts. The ordinary ten seconds is right
+     * for a heartbeat and wrong for that, because the platform hashes the whole reassembled file
+     * before it answers - a pass over a database, not over a payload.
+     *
+     * Reported live, and the failure was worse than a slow request. The connector gave up at ten
+     * seconds, reported the job failed, and the platform settled the artifact as failed and deleted
+     * the parts - while its own assembly was still running and about to store them. One upload,
+     * finished successfully on one side and thrown away by the other.
+     *
      * @param  array<string, mixed>  $payload
      * @param  bool  $expectSigned  require and verify a platform signature on the response
+     * @param  bool  $patient  allow the upload timeout rather than the ordinary one
      * @return array<string, mixed>
      */
-    public function post(string $path, array $payload, bool $expectSigned = false): array
+    public function post(string $path, array $payload, bool $expectSigned = false, bool $patient = false): array
     {
         $connection = Plugin::getInstance()->connection;
         $record = $connection->current();
@@ -182,7 +193,7 @@ class Client extends Component
             Protocol::HEADER_NONCE => $nonce,
             Protocol::HEADER_CONNECTOR_VERSION => Plugin::VERSION,
             Protocol::HEADER_SIGNATURE => Protocol::SIGNATURE_SCHEME . '=' . $signature,
-        ]);
+        ], $patient);
 
         $decoded = $this->decode($response['body']);
 
@@ -849,12 +860,24 @@ class Client extends Component
      * @param  array<string, string>  $headers
      * @return array{status: int, body: string, headers: array<string, list<string>>}
      */
-    private function send(string $platformUrl, string $path, string $body, array $headers): array
+    private function send(string $platformUrl, string $path, string $body, array $headers, bool $patient = false): array
     {
         $settings = Plugin::getInstance()->getSettings();
 
         $client = Craft::createGuzzleClient([
-            'timeout' => $settings->timeout,
+            /*
+             | Two different questions, and only one of them is about reaching the platform.
+             |
+             | `connect_timeout` stays short always: a platform that will not answer the socket must
+             | never become a slow website, and that is true of every request this makes.
+             |
+             | The overall budget is the one that varies. Ten seconds is right for anything the
+             | platform composes from a row it already has, and wrong for asking it to assemble an
+             | artifact - which is a SHA-256 pass over a whole database before it can reply. Sharing
+             | one number meant the connector abandoned a successful upload at ten seconds and
+             | reported it as failed.
+            */
+            'timeout' => $patient ? $settings->uploadTimeout : $settings->timeout,
             'connect_timeout' => $settings->timeout,
 
             // A non-2xx response is information, not an exception: the platform's rejections carry
