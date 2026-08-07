@@ -279,7 +279,21 @@ class BackupRunner extends Component
                 */
                 $plugin->client->putFileInParts($contentPath, $encrypted['path'], $partBytes);
 
-                $result = $plugin->client->post("/api/connector/v1/backups/{$artifactId}/assembled", []);
+                /*
+                 | Patient, because this is the one request whose duration is the size of a database.
+                 |
+                 | The platform hashes the whole reassembled artifact against the checksum in the
+                 | manifest this site signed before it answers, and on anything past a few hundred
+                 | megabytes that is longer than the ordinary ten-second budget. Giving up here does
+                 | not merely lose the answer: the job is reported failed, and the platform then
+                 | settles the artifact as failed and deletes the parts - while its own assembly is
+                 | still running and about to store them. An upload that worked, thrown away.
+                */
+                $result = $plugin->client->post(
+                    "/api/connector/v1/backups/{$artifactId}/assembled",
+                    [],
+                    patient: true,
+                );
             } else {
                 $result = $plugin->client->putFile($contentPath, $encrypted['path'], $contentHash);
             }

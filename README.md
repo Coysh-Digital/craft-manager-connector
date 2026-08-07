@@ -53,7 +53,7 @@ work, the security model, the console commands, and troubleshooting.
 ## Installation
 
 ```bash
-composer require "coysh-digital/craft-manager-connector:^1.13.0" -w && php craft plugin/install manager-connector
+composer require "coysh-digital/craft-manager-connector:^1.13.1" -w && php craft plugin/install manager-connector
 ```
 
 Three details in that line, each of which has cost somebody a support message:
