@@ -72,10 +72,22 @@ class RunTask extends BaseJob implements RetryableJobInterface
      * Derived from `uploadTimeout` rather than chosen independently, so an operator who has already
      * raised the one number describing a slow upload does not have to find this one too. The upload
      * is the long phase; the half hour on top covers the dump and the encryption.
+     *
+     * **`uploadTimeout` stopped bounding the whole upload when artifacts started going in parts, and
+     * this had to move with it.** It is now a per-request budget, so an artifact large enough to take
+     * several hours became possible for the first time - and this reservation, which had never been
+     * reached because Guzzle's own timeout ended the upload first, would have become the new wall.
+     * The backup would have died partway through with the queue starting a second dump of a
+     * production database, which is precisely the failure this method exists to prevent.
+     *
+     * Six hours, matching the window a platform gives a declared artifact to arrive. That is the
+     * outside edge of how long an upload can usefully run: past it the platform writes the
+     * declaration off, so reserving the job for longer would reserve it for work that has already
+     * stopped counting. Still derived from `uploadTimeout` when an operator has raised it past that.
      */
     public function getTtr(): int
     {
-        return Plugin::getInstance()->getSettings()->uploadTimeout + 1800;
+        return max(21600, Plugin::getInstance()->getSettings()->uploadTimeout + 1800);
     }
 
     /**

@@ -70,6 +70,12 @@ class Settings extends Model
      * artifact on a domestic uplink is measured in hours, so the ceiling allows a day - but raising
      * this is a deliberate act by somebody who knows their database is large, not a default anybody
      * inherits.
+     *
+     * **What it bounds depends on the platform, and the difference is worth knowing.** Against one
+     * new enough to accept an artifact in parts, this is a per-request budget for a piece of a few
+     * megabytes - so the default covers a database of any size, and exceeding it means a part has
+     * stalled rather than a database being large. Against an older platform the whole artifact goes
+     * in one request and this bounds all of it, which is what the paragraph above was written for.
      */
     public int $uploadTimeout = 900;
 

@@ -108,7 +108,7 @@ class Client extends Component
             throw new RuntimeException(
                 'Pairing was refused by the platform.'
                 . $this->reasonFrom($decoded)
-                . $this->attribution($response['body'], $decoded, $response['headers'])
+                . $this->attribution($response['status'], $response['body'], $decoded, $response['headers'])
             );
         }
 
@@ -191,7 +191,7 @@ class Client extends Component
                 'The platform rejected the request (HTTP %d).%s%s',
                 $response['status'],
                 $this->reasonFrom($decoded),
-                $this->attribution($response['body'], $decoded, $response['headers']),
+                $this->attribution($response['status'], $response['body'], $decoded, $response['headers']),
             ));
         }
 
@@ -486,19 +486,146 @@ class Client extends Component
         return 'uploads.' . $host;
     }
 
+    /**
+     * Send a whole artifact to the platform in one request.
+     *
+     * What every connector did before uploading in parts existed, and what one still does when the
+     * platform is too old to offer them. Kept rather than deprecated: there is nothing wrong with it
+     * on an artifact small enough to send in one go, and a platform that has not been upgraded must
+     * keep receiving backups.
+     *
+     * @return array<string, mixed>
+     */
     public function putFile(string $path, string $filePath, string $contentHash): array
     {
-        $connection = Plugin::getInstance()->connection;
-        $record = $connection->current();
+        $bytes = filesize($filePath);
 
-        if ($record === null) {
-            throw new RuntimeException('This site is not paired with a Manager platform.');
+        if ($bytes === false || $bytes <= 0) {
+            throw new RuntimeException('There is nothing to upload.');
+        }
+
+        $decoded = $this->putArtifactBytes($path, $filePath, 0, $bytes, $contentHash);
+
+        Plugin::getInstance()->connection->recordSuccess();
+
+        return $decoded;
+    }
+
+    /**
+     * Send an artifact to the platform a bounded piece at a time.
+     *
+     * The reason is a failure mode rather than an optimisation. A request carrying a whole database
+     * is a request long enough for a web server or a PHP process on the platform host to end, and
+     * when one does this site is handed an HTML error page - no correlation identifier, nothing in
+     * the platform's own log, at the end of however long the upload had been running. A request
+     * carrying a few megabytes is not, whatever size the database is.
+     *
+     * Sequential, one at a time, for the reason {@see self::putToGrant()} gives about the direct
+     * path: this runs on somebody's production site, and saturating their uplink to finish sooner is
+     * not this plugin's call. Each part is retried on its own rather than restarting the upload,
+     * because on a large artifact one dropped connection near the end would otherwise cost hours of a
+     * customer's bandwidth and get no further next time.
+     *
+     * **The destination is not a parameter here either.** `$basePath` is a path on the platform this
+     * site paired with, exactly as {@see self::putFile()} takes one, and the host is assembled in
+     * {@see self::putArtifactBytes()} from the stored connection record. There is no argument on this
+     * signature a platform response could reach, and `bin/verify-invariants.php` checks that there is
+     * not.
+     *
+     * @param  string  $basePath  the artifact's content path; each part appends its own number
+     */
+    public function putFileInParts(string $basePath, string $filePath, int $partBytes): void
+    {
+        if ($partBytes <= 0) {
+            throw new RuntimeException('the platform offered parts without a part size');
         }
 
         $bytes = filesize($filePath);
 
         if ($bytes === false || $bytes <= 0) {
             throw new RuntimeException('There is nothing to upload.');
+        }
+
+        $part = 1;
+        $total = (int) ceil($bytes / $partBytes);
+
+        while (true) {
+            $offset = ($part - 1) * $partBytes;
+
+            if ($offset >= $bytes) {
+                break;
+            }
+
+            $length = (int) min($partBytes, $bytes - $offset);
+
+            // Hashed from the slice this request will actually carry. The signature covers this hash
+            // and the path the part number is in, so a part cannot be replayed at another offset.
+            $hash = $this->hashSlice($filePath, $offset, $length);
+
+            $attempts = 0;
+
+            while (true) {
+                $attempts++;
+
+                try {
+                    $this->putArtifactBytes($basePath . '/' . $part, $filePath, $offset, $length, $hash);
+
+                    break;
+                } catch (ArtifactPartOutOfOrder $e) {
+                    /*
+                     | The platform knows where it is and this site does not.
+                     |
+                     | Which happens after a part whose response never arrived: it was received, this
+                     | site did not learn so, and the retry landed somewhere the platform cannot
+                     | accept. Jumping to where it says to continue is the whole reason it answers
+                     | with a part number instead of a bare refusal - the alternative is sending a
+                     | twenty-gigabyte database again.
+                     |
+                     | Not counted as an attempt. It is not a failure, and treating it as one would
+                     | spend the retry budget on the platform being right.
+                    */
+                    $part = $e->resumeFromPart;
+
+                    continue 2;
+                } catch (Throwable $e) {
+                    if ($attempts >= 3) {
+                        throw new RuntimeException(sprintf(
+                            'part %d of %d could not be uploaded: %s',
+                            $part,
+                            $total,
+                            $e->getMessage(),
+                        ), 0, $e);
+                    }
+                }
+            }
+
+            $part++;
+        }
+    }
+
+    /**
+     * One signed request carrying a bounded slice of an artifact to the platform.
+     *
+     * Shared by the whole-file upload and the part-by-part one, so that both get the same signing,
+     * the same client hardening and - the reason this is one method rather than two - the same
+     * account of *who* refused. A second copy of the response handling would eventually stop
+     * distinguishing a platform rejection from a proxy's error page, which is the distinction that
+     * cost four nights.
+     *
+     * The timestamp and nonce are generated here, per request. Signing every part up front would
+     * put the last one outside the platform's timestamp tolerance on any upload of consequence.
+     *
+     * @return array<string, mixed>
+     *
+     * @throws ArtifactPartOutOfOrder when the platform is expecting a different part
+     */
+    private function putArtifactBytes(string $path, string $filePath, int $offset, int $length, string $contentHash): array
+    {
+        $connection = Plugin::getInstance()->connection;
+        $record = $connection->current();
+
+        if ($record === null) {
+            throw new RuntimeException('This site is not paired with a Manager platform.');
         }
 
         $timestamp = time();
@@ -534,6 +661,10 @@ class Client extends Component
             $client = Craft::createGuzzleClient([
                 // Longer than an ordinary request, because this one is measured in megabytes rather
                 // than milliseconds. Still bounded: an upload that stalls has to end eventually.
+                //
+                // Per part rather than per artifact once an upload is in pieces, which is a much
+                // more useful thing for it to bound: it now means "this part has stalled" instead of
+                // "this database is bigger than fifteen minutes of bandwidth".
                 'timeout' => $settings->uploadTimeout,
                 'connect_timeout' => $settings->timeout,
                 'http_errors' => false,
@@ -554,8 +685,11 @@ class Client extends Component
             ]);
 
             $response = $client->put(rtrim(self::requireSecureUrl($record->platformUrl), '/') . $path, [
-                // Guzzle streams from the handle rather than buffering it.
-                'body' => $handle,
+                // A LimitStream over the open handle rather than a string, so no part of a customer's
+                // database is ever held in memory - the same construction the direct-upload path uses
+                // and for the same reason. For a whole-file upload the window is the whole file, which
+                // is what Guzzle streaming from the handle already did.
+                'body' => new LimitStream(Utils::streamFor($handle), $length, $offset),
                 'headers' => [
                     Protocol::HEADER_SITE => $record->siteIdentifier,
                     Protocol::HEADER_TIMESTAMP => (string) $timestamp,
@@ -567,7 +701,7 @@ class Client extends Component
                     // Declared so the platform can refuse an oversized upload before reading it. Sent
                     // explicitly because a streamed body would otherwise go out chunked, with no length
                     // for the platform to check.
-                    'Content-Length' => (string) $bytes,
+                    'Content-Length' => (string) $length,
                     'Content-Type' => 'application/octet-stream',
                     'Accept' => 'application/json',
                     'User-Agent' => 'ManagerConnector/' . Plugin::VERSION . ' (Craft)',
@@ -585,20 +719,70 @@ class Client extends Component
         // body is what tells a platform rejection apart from a proxy's error page.
         $raw = (string) $response->getBody();
         $decoded = $this->decode($raw);
+        $status = $response->getStatusCode();
 
-        if ($response->getStatusCode() >= 400) {
+        // Not a rejection: the platform is telling this site where it actually is. Raised as its own
+        // type so the caller can resume rather than counting it against a retry budget.
+        if ($status === 409 && ($decoded['error'] ?? null) === 'part_out_of_order') {
+            throw new ArtifactPartOutOfOrder(max(1, (int) ($decoded['resume_from_part'] ?? 1)));
+        }
+
+        if ($status >= 400) {
             throw new RuntimeException(sprintf(
                 'The platform rejected the artifact (HTTP %d).%s%s',
-                $response->getStatusCode(),
+                $status,
                 $this->reasonFrom($decoded),
-                $this->attribution($raw, $decoded, $response->getHeaders()),
+                $this->attribution($status, $raw, $decoded, $response->getHeaders()),
             ));
         }
 
-        $connection->recordSuccess();
-
         return $decoded;
     }
+
+    /**
+     * SHA-256 of one slice of a file, read a chunk at a time.
+     *
+     * Never the whole slice as a string. A part is bounded, but "bounded" is a number an operator
+     * sets on the platform and this runs inside somebody's production site - so it is read the same
+     * way it is sent.
+     */
+    private function hashSlice(string $filePath, int $offset, int $length): string
+    {
+        $handle = fopen($filePath, 'rb');
+
+        if ($handle === false || fseek($handle, $offset) !== 0) {
+            if (is_resource($handle)) {
+                fclose($handle);
+            }
+
+            throw new RuntimeException('Could not read the artifact for hashing.');
+        }
+
+        $hash = hash_init('sha256');
+        $remaining = $length;
+
+        try {
+            while ($remaining > 0) {
+                $chunk = fread($handle, (int) min(Protocol::ARTIFACT_CHUNK_BYTES, $remaining));
+
+                if ($chunk === false || $chunk === '') {
+                    break;
+                }
+
+                hash_update($hash, $chunk);
+                $remaining -= strlen($chunk);
+            }
+        } finally {
+            fclose($handle);
+        }
+
+        if ($remaining !== 0) {
+            throw new RuntimeException('The artifact was shorter than the part it was sliced into.');
+        }
+
+        return hash_final($hash);
+    }
+
 
     /**
      * Refuse a platform URL that is not HTTPS.
@@ -761,10 +945,18 @@ class Client extends Component
      * chose not to include one. Merging the two would trade a message that is unhelpful for a
      * message that is wrong.
      *
+     * **Which layer to look at depends on the status, and this used to say "body size" for all of
+     * them.** That advice was written from the 413 above and is right for a 413. It is wrong for a
+     * 502, which is not a refusal at all: it is the upstream dying or timing out while the body was
+     * still arriving, and it happened - a console answered a backup with one, and the message sent
+     * everybody back to the size ceiling for a second time. A body limit and a request timeout are
+     * different settings in different files, and telling somebody to check the wrong one costs
+     * exactly as much as telling them nothing.
+     *
      * @param  array<string, mixed>  $decoded
      * @param  array<string, list<string>>  $headers
      */
-    private function attribution(string $body, array $decoded, array $headers): string
+    private function attribution(int $status, string $body, array $decoded, array $headers): string
     {
         $correlationId = $this->correlationFrom($decoded, $headers);
 
@@ -775,10 +967,22 @@ class Client extends Component
         // The same test decode() applies, asked about the raw body rather than its result: anything
         // that is not a JSON object is not something this platform composed.
         if (!is_array(json_decode($body, true))) {
+            $where = in_array($status, [502, 503, 504], true)
+
+                // Nothing refused this. Something upstream of the web server stopped answering while
+                // the body was on its way, which on an upload means a timeout rather than a limit -
+                // and it is a timeout no setting on the platform can raise, because php-fpm's
+                // request_terminate_timeout ends the process from outside PHP.
+                ? 'the web server or PHP process on the platform host stopped answering part-way '
+                    . 'through - check the request timeouts there rather than the body size limit, '
+                    . 'and upgrade the platform if it is old enough to still want the whole artifact '
+                    . 'in one request'
+
+                : 'check the upload body size limit on the platform host';
+
             return ' No correlation ID was returned and the response was not JSON, so a proxy or web '
-                . 'server in front of the platform refused this before it reached the application - '
-                . 'check the upload body size limit on the platform host. Nothing about this will '
-                . 'appear in the platform log.';
+                . 'server in front of the platform answered this before it reached the application - '
+                . $where . '. Nothing about this will appear in the platform log.';
         }
 
         return ' Correlation ID: unknown';
