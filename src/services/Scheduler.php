@@ -109,6 +109,32 @@ class Scheduler extends Component
     }
 
     /**
+     * Hold a task off as though it had just run on schedule.
+     *
+     * Called when something outside the schedule has already pushed a task - today only the nudge
+     * endpoint, which pushes `jobs` the moment the platform asks it to. Without this the ordinary
+     * schedule would push the same task again on the next request that found it due, so a nudge would
+     * routinely be followed by a redundant claim a moment later.
+     *
+     * Writes the same claim key {@see self::claim()} writes, so the two cannot disagree about when a
+     * task is next due.
+     */
+    public function markRan(string $task): void
+    {
+        $interval = Tasks::schedule()[$task] ?? null;
+
+        if ($interval === null) {
+            return;
+        }
+
+        try {
+            Craft::$app->getCache()->set(self::CLAIM_PREFIX . $task, 1, $interval);
+        } catch (Throwable) {
+            // Only costs a duplicate claim on the next request. Nothing to report.
+        }
+    }
+
+    /**
      * When each task is next due, for the status command.
      *
      * @return array<string, bool> task => due now

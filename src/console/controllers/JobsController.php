@@ -22,8 +22,10 @@ use yii\console\ExitCode;
  * Asks the platform whether there is anything to do, and does it. Intended for cron alongside the
  * heartbeat.
  *
- * Nothing is pushed to this site: the platform has no way to reach it. This is the site choosing to
- * ask, which is what lets it work from behind NAT with no inbound firewall rule.
+ * No work is ever pushed to this site. The platform may knock to ask for an early check-in, but what it
+ * can say is "check in now" and nothing else - this command, and the claim it makes, is still the site
+ * choosing to ask and deciding for itself what to do with the answer. Nothing depends on that knock
+ * arriving, which is what lets this work from behind NAT with no inbound firewall rule.
  */
 class JobsController extends BaseController
 {

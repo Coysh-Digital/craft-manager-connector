@@ -1,7 +1,8 @@
 # Manager Connector for Craft CMS
 
 Reports operational metadata from a Craft CMS 4 or 5 installation to
-[Manager for Craft](https://managerforcraft.com) over signed, outbound-only requests.
+[Manager for Craft](https://managerforcraft.com) over signed outbound requests. Manager can knock to ask
+for an early check-in; it cannot ask for anything else.
 
 Requires PHP 8.1+ and Craft CMS 4.4+ or 5.0+.
 
@@ -16,7 +17,7 @@ Requires PHP 8.1+ and Craft CMS 4.4+ or 5.0+.
 These are not promises about intent; they are properties of the code.
 
 |---|---|
-| **No inbound endpoint** | The plugin registers no site or control-panel route that accepts management input. Every exchange is started by this plugin, outbound. It works from behind NAT with no inbound firewall rules. |
+| **No inbound instruction** | The plugin registers no URL rules at all. One endpoint answers without a session, and all it can say is "check in now" - it reads no parameters, takes no body, and pushes the same task the site already runs on its own timer. Everything the platform wants done is still discovered by this plugin calling out and reading a signed answer. Nothing depends on a nudge arriving, so a site behind NAT still needs no inbound firewall rule; it just waits for its own schedule. |
 | **No remote execution** | There is no console-command runner, no PHP evaluation, no SQL, no shell, no arbitrary file access. Jobs come from a closed registry, and this plugin refuses any type it does not itself implement - so a compromised platform cannot make your site do something new. |
 | **No credentials held** | Manager never receives an administrator password, an SSH credential or a database password. There is nowhere in its schema to put one. |
 | **No site content** | What may be transmitted is fixed by a shared schema. The platform rejects anything outside it rather than quietly discarding the extra. |
@@ -53,7 +54,7 @@ work, the security model, the console commands, and troubleshooting.
 ## Installation
 
 ```bash
-composer require "coysh-digital/craft-manager-connector:^1.13.1" -w && php craft plugin/install manager-connector
+composer require "coysh-digital/craft-manager-connector:^1.14.0" -w && php craft plugin/install manager-connector
 ```
 
 Three details in that line, each of which has cost somebody a support message:
@@ -114,8 +115,10 @@ The heartbeat carries no data at all. Hourly is plenty for the inventory report,
 numbers only change when you deploy. The update check runs daily and at an odd minute, so a fleet of
 sites does not all ask Craft's update service at once.
 
-`jobs` is what makes anything the platform asks for actually happen. Nothing is pushed to your site -
-the platform has no way to reach it - so this is the site choosing to ask.
+`jobs` is what makes anything the platform asks for actually happen. No work is ever pushed to your
+site: the platform may knock to ask for an early check-in, but that is all it can say, and this command
+is still the site choosing to ask and deciding for itself what to do with the answer. Nothing depends on
+that knock arriving - if it cannot reach you, the schedule above is all that happens.
 
 ## Commands
 

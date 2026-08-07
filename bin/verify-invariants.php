@@ -82,17 +82,28 @@ $sources = phpFilesIn($sourceDir);
 // run on managed hosting with no shell, and requiring SSH to pair would exclude them rather than
 // inconvenience them.
 //
-// So this no longer checks that no controller exists. It checks the properties that make the one that
-// does exist safe, which is a harder thing to satisfy by accident:
+// So this no longer checks that no controller exists. It checks the properties that make the ones that
+// do exist safe, which is a harder thing to satisfy by accident:
 //
 //   - no site routes at all, ever - those are genuinely public
 //   - control-panel routes limited to an allowlist written here
-//   - every web controller refuses anonymous access and requires an administrator
+//   - every web controller refuses anonymous access and requires an administrator, **except** the one
+//     named in $anonymousControllers below, which is held to a stricter set of rules instead
 //   - every state-changing action requires POST, so Craft's CSRF token is enforced
 //   - no web controller reads a job, a command or a capability from the request
 //
-// The last one is the line that keeps invariant 5 true. A form here causes this site to call the
-// platform; nothing lets the platform call in, and nothing web-reachable accepts an instruction.
+// Invariant 4 was once "the connector exposes no public inbound endpoint". It is now:
+//
+//   The connector exposes no public inbound endpoint that can carry an instruction. Exactly one
+//   anonymous endpoint exists; its entire vocabulary is "poll", it reads no request parameters, it
+//   returns an empty body, and it can cause nothing the site's own scheduler cannot already cause.
+//
+// That is a narrowing rather than a relaxation, and it is checked rather than asserted. The nudge
+// endpoint exists because a backup requested in Manager otherwise waits for the site to notice - up to
+// five minutes with cron, and until a visitor arrives without it. What it can do is push the same task
+// the web trigger already pushes unauthenticated on every request. Everything that decides anything
+// happens in the ordinary signed claim that follows, which is why the rules below are all about the
+// endpoint carrying *nothing* rather than about validating what it carries.
 $checks++;
 
 foreach ($sources as $file) {
@@ -124,6 +135,36 @@ if (preg_match_all("/\\\$event->rules\\['([^']+)'\\]/", $pluginSourceForRoutes, 
     }
 }
 
+// The only controllers in this plugin reachable without a Craft session. Exactly one, and adding a
+// second is an edit here as well as there. Anything named below is exempt from the administrator rules
+// and held to the stricter set that follows instead.
+$anonymousControllers = ['src/controllers/NudgeController.php'];
+
+// The whole set, asserted rather than merely iterated. Without this a second anonymous controller could
+// appear simply by not being named anywhere - the check above would exempt nothing and the check below
+// would apply nothing, and a file that satisfies neither rule set would pass silently.
+$controllerFiles = [];
+
+foreach ($sources as $file) {
+    $relative = str_replace($root.'/', '', $file);
+
+    if (str_contains($relative, 'src/controllers/')) {
+        $controllerFiles[] = $relative;
+    }
+}
+
+$expectedControllers = ['src/controllers/EnrolController.php', 'src/controllers/NudgeController.php'];
+
+sort($controllerFiles);
+sort($expectedControllers);
+
+if ($controllerFiles !== $expectedControllers) {
+    $failures[] = 'src/controllers/ holds '.implode(', ', $controllerFiles)
+        .', which is not the reviewed set ('.implode(', ', $expectedControllers).'). Every web '
+        .'controller is either administrator-gated or on the anonymous list in this script, and a new '
+        .'one is a decision to make here (invariant 4).';
+}
+
 // --------------------------------------------------------------------------------------------------
 // Every web controller is administrator-only, POST-only, and deaf to the platform.
 // --------------------------------------------------------------------------------------------------
@@ -132,7 +173,7 @@ $checks++;
 foreach ($sources as $file) {
     $relative = str_replace($root.'/', '', $file);
 
-    if (! str_contains($relative, 'src/controllers/')) {
+    if (! str_contains($relative, 'src/controllers/') || in_array($relative, $anonymousControllers, true)) {
         continue;
     }
 
@@ -179,6 +220,179 @@ foreach ($sources as $file) {
             $failures[] = "{$relative} reads '{$forbidden}' from the request. Web routes must not accept "
                 .'platform instructions (invariants 5 and 8).';
         }
+    }
+}
+
+// --------------------------------------------------------------------------------------------------
+// The anonymous endpoint carries nothing, decides nothing, and answers with nothing.
+// --------------------------------------------------------------------------------------------------
+//
+// These replace the administrator rules above rather than supplementing them, and they are deliberately
+// harder to satisfy. The endpoint is publicly reachable, so the only safe design is one with nowhere to
+// put an instruction - every rule here exists to keep it that way.
+$checks++;
+
+foreach ($anonymousControllers as $relative) {
+    $path = $root.'/'.$relative;
+
+    if (! is_file($path)) {
+        $failures[] = "{$relative} is on the anonymous controller list but does not exist. Remove it "
+            .'from the list, or restore the file (invariant 4).';
+
+        continue;
+    }
+
+    $contents = sourceWithoutComments($path);
+
+    // (a) The narrowest grant Craft offers. Not `true`, which would answer on an offline site - and a
+    // site that is offline is usually one somebody is working on.
+    if (! preg_match('/\\$allowAnonymous\s*=\s*self::ALLOW_ANONYMOUS_LIVE\s*;/', $contents)) {
+        $failures[] = "{$relative} does not declare \$allowAnonymous = self::ALLOW_ANONYMOUS_LIVE. "
+            .'Anything wider answers when the site is offline (invariant 4).';
+    }
+
+    // (b) POST without CSRF is correct here, because authentication is the signature rather than the
+    // session - but it has to be stated, not inherited from a default that could change.
+    if (! preg_match('/\\$enableCsrfValidation\s*=\s*false\s*;/', $contents)) {
+        $failures[] = "{$relative} does not declare \$enableCsrfValidation = false. An anonymous signed "
+            .'endpoint must state that it opts out rather than inherit it (invariant 4).';
+    }
+
+    $actions = preg_match_all('/public function action(\w+)\(/', $contents, $found) ? $found[1] : [];
+    $postRequirements = preg_match_all('/requirePostRequest\(\)/', $contents);
+
+    if ($actions !== [] && $postRequirements < count($actions)) {
+        $failures[] = "{$relative} has ".count($actions).' actions but only '.$postRequirements
+            .' requirePostRequest() calls (invariant 4).';
+    }
+
+    // (c) Not "no forbidden parameter names" - no parameters at all. The endpoint has one meaning and
+    // needs no input to express it, so anything it could read is something it should not have.
+    foreach (['getBodyParam', 'getQueryParam', 'getBodyParams', 'getQueryParams'] as $reader) {
+        if (str_contains($contents, $reader.'(')) {
+            $failures[] = "{$relative} calls {$reader}(). The anonymous endpoint takes no parameters at "
+                .'all; a parameter is somewhere an instruction could live (invariants 4 and 5).';
+        }
+    }
+
+    // (d) And no body. Refused outright rather than ignored, because the canonical string does not cover
+    // a body - so anything arriving in one would be unsigned material the endpoint had accepted.
+    if (! preg_match('~getRawBody\(\)\s*!==\s*\'\'~', $contents)) {
+        $failures[] = "{$relative} does not refuse a request that arrives with a body. The signature "
+            .'does not cover one, so it must be rejected rather than ignored (invariant 5).';
+    }
+
+    // (e) The whole vocabulary, in one line of code. A second task here would be a second thing the
+    // platform can trigger directly, which is the door this endpoint is deliberately not.
+    if (! preg_match('~new RunTask\(\[\s*\'task\'\s*=>\s*Tasks::JOBS\s*,?\s*\]\)~', $contents)) {
+        $failures[] = "{$relative} does not push exactly RunTask(['task' => Tasks::JOBS]). The endpoint's "
+            .'entire vocabulary is "poll" (invariant 4).';
+    }
+
+    if (preg_match_all('/Tasks::([A-Z_]+)/', $contents, $tasksUsed)) {
+        foreach (array_unique($tasksUsed[1]) as $constant) {
+            if ($constant !== 'JOBS') {
+                $failures[] = "{$relative} names Tasks::{$constant}. The anonymous endpoint may trigger "
+                    .'the claim task and nothing else (invariant 4).';
+            }
+        }
+    }
+
+    foreach (['Jobs::', 'inventory.refresh', 'updates.check', 'backup.create'] as $vocabulary) {
+        if (str_contains($contents, $vocabulary)) {
+            $failures[] = "{$relative} names '{$vocabulary}'. Job types are chosen by the platform and "
+                .'read from a signed claim, never named at an anonymous endpoint (invariants 4 and 9).';
+        }
+    }
+
+    // (f) Two status codes, no body. A response with content is a response that could answer a question,
+    // and every question this endpoint could answer is one a prober is asking.
+    if (preg_match_all('/setStatusCode\((\d+)\)/', $contents, $codes)) {
+        foreach (array_unique($codes[1]) as $code) {
+            if (! in_array($code, ['202', '401'], true)) {
+                $failures[] = "{$relative} can answer with {$code}. The anonymous endpoint answers 202 or "
+                    .'401 and nothing else, so a refusal cannot be told apart from any other refusal '
+                    .'(invariant 4).';
+            }
+        }
+    } else {
+        $failures[] = "{$relative} sets no status code explicitly; 202 and 401 must both be deliberate.";
+    }
+
+    foreach (['asJson(', 'renderTemplate(', 'setBody('] as $writer) {
+        if (str_contains($contents, $writer)) {
+            $failures[] = "{$relative} calls {$writer}). The anonymous endpoint returns an empty body "
+                .'(invariant 4).';
+        }
+    }
+
+    // (g) It enqueues. It does not itself talk to the platform, which would make an unauthenticated
+    // request into something that can cause outbound traffic on demand.
+    foreach (['client->post(', 'client->putFile', 'Client::'] as $caller) {
+        if (str_contains($contents, $caller)) {
+            $failures[] = "{$relative} calls {$caller}. A nudge is answered by queueing work, never by "
+                .'calling the platform from inside the request (invariant 5).';
+        }
+    }
+
+    // (h) The verifying key comes from the pairing this site stored. A key read from the request would
+    // make the signature a formality - the same shape as the recipient-pinning check further down.
+    // Construction and verification, not merely the word - an import satisfies str_contains() while the
+    // signature check has been swapped for something else entirely, which is how this check first
+    // failed to catch its own mutation test.
+    if (! preg_match('~new CanonicalNudge\(~', $contents)) {
+        $failures[] = "{$relative} does not build a CanonicalNudge. An anonymous endpoint that triggers "
+            .'anything must authenticate first (invariant 5).';
+    }
+
+    if (! preg_match('~\\$nudge->verify\(~', $contents)) {
+        $failures[] = "{$relative} builds a CanonicalNudge but never verifies it (invariant 5).";
+    }
+
+    foreach (['CanonicalRequest', 'CanonicalResponse'] as $wrongForm) {
+        if (str_contains($contents, $wrongForm)) {
+            $failures[] = "{$relative} names {$wrongForm}. A nudge has its own canonical form; verifying "
+                .'against another one would accept a signature made for a different purpose '
+                .'(invariant 5).';
+        }
+    }
+
+    if (! str_contains($contents, '$record->platformPublicKey')) {
+        $failures[] = "{$relative} does not verify against \$record->platformPublicKey, the key pinned at "
+            .'pairing (invariant 5).';
+    }
+
+    foreach (['public_key', 'publicKey\'', 'platform_public_key'] as $fromWire) {
+        if (preg_match('/getHeaders\(\)->get\([^)]*'.preg_quote($fromWire, '/').'/i', $contents) === 1) {
+            $failures[] = "{$relative} reads a key from the request. The verifying key is the stored one, "
+                .'never one the caller supplied (invariant 5).';
+        }
+    }
+
+    // (i) Replay and amplification are structural here, not intentional. `add()` is atomic; a
+    // read-then-write would let a burst of concurrent requests all win the same claim.
+    if (! str_contains($contents, 'getCache()->add(')) {
+        $failures[] = "{$relative} does not claim through getCache()->add(). A read-then-write lets "
+            .'concurrent requests replay a nonce or bypass the throttle (invariant 4).';
+    }
+
+    foreach (['getCache()->set(', 'getCache()->get('] as $racy) {
+        if (str_contains($contents, $racy)) {
+            $failures[] = "{$relative} uses {$racy}) to decide whether to act. Only add() is atomic "
+                .'(invariant 4).';
+        }
+    }
+
+    // One claim makes the nonce single-use; the other stops a burst of nudges becoming a burst of
+    // claims. Both must exist, and both must be able to stop the request.
+    if (! preg_match('~if\s*\(\s*!\s*\$this->claim\(self::NONCE_PREFIX~', $contents)) {
+        $failures[] = "{$relative} does not refuse a replayed nonce before acting (invariant 4).";
+    }
+
+    if (! preg_match('~if\s*\(\s*!\s*\$this->claim\(self::CLAIM_KEY~', $contents)) {
+        $failures[] = "{$relative} does not throttle nudge-driven check-ins. Without it, an endpoint "
+            .'anyone can reach becomes a way of making this site call the platform repeatedly '
+            .'(invariant 4).';
     }
 }
 
@@ -469,7 +683,7 @@ $settingsTemplate = is_file($templateDir.'/settings.twig')
     ? (string) file_get_contents($templateDir.'/settings.twig')
     : '';
 
-foreach (['recoveryKeyFingerprints', 'requirePinnedRecoveryKeys', 'backupUploadHost'] as $configOnly) {
+foreach (['recoveryKeyFingerprints', 'requirePinnedRecoveryKeys', 'backupUploadHost', 'acceptNudges'] as $configOnly) {
     if (str_contains($settingsTemplate, $configOnly)) {
         $failures[] = "src/templates/settings.twig exposes {$configOnly}; it must be config-file only, or a hijacked control-panel session could change who can read this site's backups (invariant 8).";
     }

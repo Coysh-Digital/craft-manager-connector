@@ -1,5 +1,106 @@
 # Changelog
 
+## 1.14.0 - 2026-08-07
+
+A backup requested in Manager used to sit there. This is the site learning to answer the door.
+
+### Manager can now ask a site to check in, instead of waiting to be called
+
+Until now every exchange started here: the site called the platform on its own schedule, and work
+queued in Manager waited to be collected. With cron that is up to five minutes. Without cron the
+schedule runs off ordinary web traffic, so it waited for somebody to visit - which on a quiet site is
+not five minutes, it is however long it is. For that whole time the screen in Manager was correct and
+looked broken.
+
+`POST actions/manager-connector/nudge/poll` is the site answering. It is the first anonymous endpoint
+this plugin has ever had, so it is worth being exact about what it can and cannot do.
+
+**Its entire vocabulary is "poll".** It reads no parameters, refuses a request that arrives with a
+body, and does one thing: pushes the same `jobs` task the site already pushes on its own timer. What
+happens next is the ordinary signed claim that has always happened - the site asks the platform what is
+waiting and decides for itself what to do with the answer. Every check that matters is behind that
+claim and none of it moved: `JobRunner` still refuses job types it does not implement, `RecipientPin`
+still refuses recovery keys this site has not pinned, and the upload host is still derived rather than
+accepted. **So the worst a forged, replayed or misdirected nudge achieves is an early poll.**
+
+There is nowhere to put an instruction, which is a stronger guarantee than validating one would be.
+
+To answer at all, a nudge must carry an Ed25519 signature over `MGR1-NUDGE`, the site identifier, a
+timestamp and a nonce - verified against the platform public key this site pinned when it paired, never
+against a key from the request. The timestamp must be within two minutes, the nonce is single-use, and
+both the nonce store and the throttle are atomic cache claims that fail closed. Every refusal is an
+empty 401, whatever the reason: an unpaired site, a wrong identifier, a stale timestamp, a bad
+signature and a replayed nonce are indistinguishable from outside, so this cannot be used to learn
+which applied.
+
+**It runs the queue, and that is the point.** Craft only arranges for a pushed job to actually run by
+injecting JavaScript into an HTML response, so the *visitor's browser* starts the runner. A request
+answering with an empty 202 gets none of that, so pushing without running would have improved nothing
+on exactly the cron-less sites this exists for. Running it is not new behaviour: Craft already ships
+`queue/run` as an anonymous endpoint on every site, and this does what that does after checking a
+signature that one does not. The job is pushed and *then* the queue is run rather than the task being
+called inline, so the queue's own reservation still applies and a nudge cannot cause a second
+concurrent dump of a production database.
+
+`runQueueAutomatically` is honoured. An operator who turned it off did so to keep queue work out of web
+requests; on such a site the nudge pushes, answers 202, and their runner picks it up in seconds anyway.
+
+### Turning it off
+
+`'acceptNudges' => false` in `config/manager-connector.php`. Config file only, like the recovery-key
+settings and for the same reason: turning it *off* is harmless, and turning it *on* from a hijacked
+control-panel session is not.
+
+Nothing else changes when it is off. The endpoint refuses everything, the site keeps its own schedule,
+and a backup requested in Manager waits for the next check-in exactly as it did before.
+
+### The invariant this narrows, and what replaced it
+
+Invariant 4 was "the connector exposes no public inbound endpoint". It is now "no public inbound
+endpoint **that can carry an instruction**", with exactly one anonymous endpoint permitted.
+
+That is a real narrowing of a property that used to be one sentence anybody could check, so
+`bin/verify-invariants.php` gained a stricter rule set than the one it removed. A controller on the
+anonymous list must declare `ALLOW_ANONYMOUS_LIVE` rather than `true`, state that it opts out of CSRF
+rather than inherit it, read *no* request parameters at all rather than merely avoid five forbidden
+names, refuse a body, push exactly `RunTask(['task' => Tasks::JOBS])` and name no other task or job
+type, answer only 202 or 401 with no body, never call the platform from inside the request, build and
+verify a `CanonicalNudge` against the stored pairing key, and claim both its nonce and its throttle
+through atomic `add()`. The set of controller files is asserted whole, so a second anonymous one cannot
+appear by being left off a list.
+
+### What was deliberately left out
+
+- **Any way for the platform to say what to do.** No job type, no capability, no destination, no
+  parameters. The nudge is a knock, not a message.
+- **A nudge that works when the site is offline.** `ALLOW_ANONYMOUS_LIVE`, not `true`: a site that is
+  offline is usually one somebody is working on, and it falls back to its own schedule.
+- **A control-panel toggle.** See above.
+- **Any promise about reaching the site.** Manager knocks on the address its operator typed. NAT,
+  IP allowlists, WAFs and basic auth all mean it does not answer, and every one of those falls back to
+  polling silently. Nudging is an optimisation and never a dependency.
+
+### Also
+
+`nudge_path` now rides on the claim request, so the platform knows where to knock. A path, never a URL
+- the platform pins the host to the domain its operator typed and takes only the path from here, the
+mirror image of the rule this connector already applies to upload hosts. Sent on the claim rather than
+at pairing because pairing happens once: an `actionTrigger` rename or a move into a subfolder would
+otherwise break nudging silently and forever, whereas this is re-stated on every check-in and heals
+itself. Omitted entirely when `acceptNudges` is false.
+
+**Eight statements in the README and documentation had stopped being true** and are corrected rather
+than softened: five said this plugin opens no inbound endpoint, and three said the platform has no way
+to reach a site at all. Each correction keeps the part that is still true, because it is the part people
+actually rely on - **nothing depends on a nudge arriving**, so a site behind NAT or a strict firewall
+still needs no inbound rule and simply keeps its own schedule.
+
+Two of the eight were found only on a second pass, after the first search looked for the word "inbound"
+and missed three sentences that made the same claim in different words. Worth recording, because a
+statement that is confidently wrong is worse than no statement at all.
+
+Requires `coysh-digital/manager-protocol` 1.8.0 for `CanonicalNudge`.
+
 ## 1.13.1 - 2026-08-07
 
 One request in 1.13.0 was given ten seconds to do a job measured in gigabytes.
