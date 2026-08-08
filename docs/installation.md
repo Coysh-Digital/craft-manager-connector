@@ -13,12 +13,18 @@ free and complete - or [Manager Cloud](https://managerforcraft.com), which is th
 Coysh Digital. This plugin is identical for both, so the choice is about who runs the server rather than
 what you get.
 
-No inbound firewall rule is needed. The plugin only ever makes outbound HTTPS requests.
+No inbound firewall rule is needed. Everything the plugin reports, and every job it runs, comes from a
+request it makes itself over outbound HTTPS.
+
+Manager can optionally knock on the site to ask it to check in early, which is what makes a requested
+backup start in seconds rather than at the next scheduled check-in. Nothing depends on that reaching
+you: if it cannot, the site keeps its own schedule. See [Security](/security) for what that endpoint can
+and cannot do, and how to turn it off.
 
 ## Install with Composer
 
 ```bash
-composer require "coysh-digital/craft-manager-connector:^1.13.1" -w && php craft plugin/install manager-connector
+composer require "coysh-digital/craft-manager-connector:^1.14.0" -w && php craft plugin/install manager-connector
 ```
 
 The version is pinned so a site records which release it took, and quoted because `^` is a glob

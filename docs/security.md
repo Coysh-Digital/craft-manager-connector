@@ -17,15 +17,37 @@ nowhere in this plugin's schema to put any of them, and the platform has nowhere
 A stolen copy of the platform's database confers no ability to impersonate any site, because only public
 keys are stored there.
 
-## Nothing inbound
+## Nothing inbound that can carry an instruction
 
 The plugin registers **no URL rules at all**. Its one screen is a Craft utility, which Craft routes, and
-its two actions go through Craft's action mechanism - POST with a CSRF token. Nothing it registers can
-be reached by following a link, and nothing at all can be reached without an authenticated control-panel
-session holding the utility permission.
+its pairing actions go through Craft's action mechanism - POST with a CSRF token, behind an
+authenticated control-panel session holding the utility permission.
 
-Every exchange with the platform is started here and goes out. The platform cannot call in. That is what
-lets a site behind NAT or a strict firewall be monitored with no inbound rule.
+There is exactly one endpoint that answers without a session, and **its entire vocabulary is "poll"**.
+`POST actions/manager-connector/nudge/poll` asks this site to check in now. It reads no parameters,
+refuses a request that arrives with a body, and does one thing: pushes the same task this site already
+runs on its own timer. What happens next is the ordinary signed exchange that has always happened - this
+site calls the platform, asks what is waiting, and decides for itself what to do with the answer.
+
+So the endpoint changes *when* a check-in happens and nothing about *what* one may do. Job types are
+still refused unless this plugin implements them, recovery keys are still refused unless this site has
+pinned them, and the upload address is still derived here rather than accepted from anywhere. The worst
+a forged, replayed or misdirected nudge achieves is an early poll.
+
+To be answered at all, a nudge must carry an Ed25519 signature over a canonical string naming this site,
+a timestamp and a nonce - verified against the platform public key this site pinned when it paired,
+never against a key from the request. The timestamp must be within two minutes and the nonce is
+single-use. Every refusal is an empty `401`, whatever the reason, so the endpoint cannot be used to
+learn whether this site is paired or which check failed.
+
+**A site behind NAT or a strict firewall still needs no inbound rule.** Nothing depends on a nudge
+arriving. If the platform cannot reach this site - NAT, an IP allowlist, a WAF, HTTP basic auth - the
+nudge simply never lands and the site keeps its own schedule, exactly as it did before this existed.
+The cost is a few minutes of latency on a requested backup, and nothing else.
+
+Set `'acceptNudges' => false` in `config/manager-connector.php` to refuse them outright. It is
+config-file only: turning it off is harmless, and turning it on from a hijacked control-panel session is
+not.
 
 ## Nothing to execute
 

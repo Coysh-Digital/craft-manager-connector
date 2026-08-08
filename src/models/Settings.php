@@ -44,6 +44,27 @@ class Settings extends Model
     public bool $webTrigger = true;
 
     /**
+     * @var bool Answer the platform when it asks this site to check in now.
+     *
+     * On by default, and the reason is the same one `webTrigger` is on: the alternative is a feature
+     * that reaches nobody, and a Manager screen that keeps saying "it will run when the site next checks
+     * in" on every site that never turned this on.
+     *
+     * What it enables is one anonymous endpoint whose entire vocabulary is "poll". It reads no
+     * parameters and takes no body, and all it does is push the same `jobs` task this site already
+     * pushes on its own timer - after checking an Ed25519 signature from the platform this site paired
+     * with, a timestamp window and a single-use nonce. Everything that decides anything happens in the
+     * ordinary signed claim that follows, so the worst a forged nudge achieves is an early poll.
+     *
+     * Turn it off if this site must expose nothing the platform can reach, and accept that a backup
+     * requested in Manager waits for the next scheduled check-in. Nothing else changes: the endpoint
+     * refuses everything while this is false, and refuses everything while the site is unpaired.
+     *
+     * Config file only, deliberately - see `src/templates/settings.twig`.
+     */
+    public bool $acceptNudges = true;
+
+    /**
      * @var bool Whether to send a heartbeat from Craft's queue as well as from cron.
      *
      * Off by default: most installations drive the connector from cron, and a queue that is not
@@ -211,7 +232,7 @@ class Settings extends Model
             [['timeout'], 'integer', 'min' => 1, 'max' => 60],
             [['uploadTimeout'], 'integer', 'min' => 30, 'max' => 86400],
             [['maxBackupMegabytes'], 'integer', 'min' => 1, 'max' => 1048576],
-            [['useQueue', 'webTrigger'], 'boolean'],
+            [['useQueue', 'webTrigger', 'acceptNudges'], 'boolean'],
         ];
     }
 }

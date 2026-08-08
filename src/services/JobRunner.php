@@ -16,6 +16,7 @@ use coyshdigital\managerprotocol\Jobs;
 use coyshdigital\managerprotocol\Protocol;
 use Craft;
 use craft\base\Component;
+use craft\helpers\UrlHelper;
 use Throwable;
 
 /**
@@ -37,6 +38,41 @@ use Throwable;
 class JobRunner extends Component
 {
     /**
+     * What this site sends when it claims work.
+     *
+     * Just the path the platform should knock on to ask for an early check-in, and only when this site
+     * is willing to answer one. It rides on the claim rather than on pairing because pairing happens
+     * once: an `actionTrigger` rename, a move into a subfolder or a plugin upgrade would otherwise break
+     * nudging silently and permanently, whereas this is re-stated every time the site checks in and
+     * therefore heals itself. Not on the heartbeat either, which is deliberately content-free.
+     *
+     * **A path, never a URL.** The platform pins the host to the domain its operator typed and takes
+     * only the path from here - the mirror image of the rule this connector already enforces on itself,
+     * where an upload host is derived from the configured platform URL rather than accepted from a
+     * response. Neither side lets the other choose where it connects.
+     *
+     * @return array<string, string>
+     */
+    private function claimBody(): array
+    {
+        if (!Plugin::getInstance()->getSettings()->acceptNudges) {
+            return [];
+        }
+
+        $path = parse_url(UrlHelper::actionUrl('manager-connector/nudge/poll'), PHP_URL_PATH);
+
+        if (!is_string($path) || $path === '') {
+            return [];
+        }
+
+        $query = parse_url(UrlHelper::actionUrl('manager-connector/nudge/poll'), PHP_URL_QUERY);
+
+        // `omitScriptNameInUrls = false` puts the action behind `index.php?p=...`, so the query is part
+        // of the address rather than decoration and has to travel with it.
+        return ['nudge_path' => is_string($query) && $query !== '' ? $path . '?' . $query : $path];
+    }
+
+    /**
      * Claim and run whatever is waiting.
      *
      * @return array{claimed: int, succeeded: int, failed: int, refused: int}
@@ -46,7 +82,11 @@ class JobRunner extends Component
         $plugin = Plugin::getInstance();
 
         // expectSigned: this response carries instructions, so an unverified one is discarded.
-        $response = $plugin->client->post('/api/connector/v1/jobs/claim', [], expectSigned: true);
+        $response = $plugin->client->post(
+            '/api/connector/v1/jobs/claim',
+            $this->claimBody(),
+            expectSigned: true,
+        );
 
         // The platform's current view of what this site may do. Adopted from a verified response, so
         // the connector stays in step when a capability is granted or revoked - without it, the

@@ -42,10 +42,13 @@ use yii\base\Event;
  *
  * Three things it does **not** do, each on purpose:
  *
- *  - It registers no site route at all, and its only control-panel route is an administrator-gated
- *    form for pairing. Every exchange with the platform is initiated by this plugin, outbound - the
- *    platform cannot call in. That is invariants 4 and 5, and it is why the plugin works from behind
- *    NAT with no inbound firewall rules.
+ *  - It registers no URL rules at all. Its control-panel form for pairing is administrator-gated, and
+ *    the one anonymous endpoint it exposes cannot carry an instruction: a nudge asks this site to
+ *    check in, and nothing else. Everything the platform actually wants done is still discovered by
+ *    this plugin calling out and reading a signed answer, so a site behind NAT that never answers a
+ *    nudge loses a few minutes of latency and nothing else. That is invariants 4 and 5 as they now
+ *    stand - see {@see \coyshdigital\managerconnector\controllers\NudgeController} for why the
+ *    narrowing is narrower than it sounds.
  *  - It executes nothing on instruction. There is no console-command runner, no PHP evaluation, no
  *    SQL, no file access. Phase 1 reports and nothing else.
  *  - It transmits no site content. What it may send is fixed by the shared inventory schema, and
@@ -76,7 +79,7 @@ class Plugin extends BasePlugin
     /**
      * @var string The connector version reported to the platform and signed into every request.
      */
-    public const VERSION = '1.13.1';
+    public const VERSION = '1.14.0';
 
     /**
      * @inheritdoc

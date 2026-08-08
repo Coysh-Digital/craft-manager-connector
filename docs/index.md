@@ -14,8 +14,8 @@ hero:
       link: /what-is-sent
 
 features:
-  - title: Outbound only
-    details: This plugin opens no inbound endpoint. Every exchange starts here and goes out, so a site behind NAT or a firewall works with no inbound rule at all, and there is nothing listening to attack.
+  - title: Nothing inbound can instruct it
+    details: One endpoint answers without a session, and all it can say is "check in now". Everything the platform wants done is discovered by this plugin calling out and reading a signed answer, so nothing depends on that endpoint being reachable - a site behind NAT or a firewall still needs no inbound rule, and simply keeps its own schedule.
   - title: No credentials to lose
     details: Manager never holds an administrator password, an SSH key or a database password. The signing key is generated on your server and only its public half is ever sent.
   - title: You decide what it may do

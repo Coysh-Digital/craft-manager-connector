@@ -22,6 +22,20 @@ return [
     // runQueueAutomatically to false, something else must run the queue or nothing will report.
     'webTrigger' => true,
 
+    // Answer the platform when it asks this site to check in now. On by default.
+    //
+    // Without this, a backup requested in Manager waits for the next scheduled check-in - up to five
+    // minutes with cron, and until somebody visits the site if the schedule runs off web traffic.
+    //
+    // It enables one anonymous endpoint whose entire vocabulary is "poll". It reads no parameters and
+    // takes no body; all it does is push the same `jobs` task this site already runs on its own timer,
+    // after checking a signature from the platform this site paired with, a timestamp window and a
+    // single-use nonce. Everything that decides anything happens in the ordinary signed claim that
+    // follows, so the worst a forged nudge achieves is an early poll.
+    //
+    // Set it to false if this site must expose nothing the platform can reach.
+    'acceptNudges' => true,
+
     // Kept for compatibility. Superseded by webTrigger, which is what actually drives the schedule.
     'useQueue' => false,
 
