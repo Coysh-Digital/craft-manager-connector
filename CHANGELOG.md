@@ -1,5 +1,24 @@
 # Changelog
 
+## 1.14.1 - 2026-08-09
+
+Nothing about this plugin's behaviour changed. Same code on a site, same wire protocol, same
+invariants.
+
+### Build
+
+- **CI pins its actions to commits rather than to tags.** `actions/checkout@v4` and
+  `shivammathur/setup-php@v2` are moving references: whoever controls those repositories can point
+  them at different code without the tag changing, and that code runs in the job that decides whether
+  this plugin is safe to publish. `audit.yml` already pinned commits and said so in a comment that
+  ended "ci.yml in this repository still uses moving tags - that is worth correcting separately".
+  This is separately. Both files now name the same two commits, and that comment now describes what
+  is true.
+
+  Little is reachable from these runs - `contents: read`, no secrets beyond `GITHUB_TOKEN`, no
+  `pull_request_target`, nothing published - which is what made this worth doing calmly rather than
+  urgently, and no reason to leave it.
+
 ## 1.14.0 - 2026-08-07
 
 A backup requested in Manager used to sit there. This is the site learning to answer the door.

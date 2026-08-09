@@ -24,8 +24,8 @@ permissions:
   contents: read
 
 # Actions pinned to the commit behind a release rather than to a tag. A tag can be moved; a commit
-# cannot. ci.yml in this repository still uses moving tags - that is worth correcting separately,
-# and a new file should not add to it.
+# cannot. This said ci.yml still used moving tags and was worth correcting separately; it has been,
+# so both files in this repository now pin the same two commits.
 
 jobs:
   advisories:
