@@ -23,7 +23,8 @@ use Throwable;
 /**
  * How the runtime is configured and how much room it is using.
  *
- * Three sections, and what each deliberately leaves out matters more than what it includes:
+ * Six sections since `system.v3`, and what each deliberately leaves out matters more than what it
+ * includes:
  *
  *  - **Storage.** Byte counts and file counts per asset volume, by handle. Never a path, never a
  *    file name, never a listing. "The uploads volume holds 4.2 GB across 18,000 files" is an
@@ -33,10 +34,23 @@ use Throwable;
  *    send the lot because it is easy; the reason not to is that half of it names the host.
  *  - **Response times.** Sampled from ordinary traffic by {@see ResponseSampler}, which explains at
  *    length why this is server render time and not time to first byte.
+ *  - **Craft.** How many deprecation warnings it has recorded, how many rows its sessions table
+ *    holds, whether a security key is set, and whether the control panel is still at the default
+ *    trigger. Counts and booleans. Never a warning's message, which names the site's own templates;
+ *    never the key; and never the trigger, because a site that moved its control panel moved it
+ *    somewhere it would rather not have written down.
+ *  - **Database.** A total size, which is the figure that decides whether a backup finishes. Never a
+ *    per-table breakdown - table names describe somebody's business.
+ *  - **Paths.** Whether Craft's own writable directories are writable, keyed by Craft's names. A
+ *    free-form label here would be a filesystem path with extra steps.
  *
  * Every section is optional in the schema. A volume that cannot be walked, an opcache that is off, a
  * site too quiet to have samples - each simply produces less, and a shorter report is valid rather
  * than deficient.
+ *
+ * The v3 sections are sent **only** when the platform has said it accepts v3. Every schema here sets
+ * `additionalProperties: false`, so an extra key sent to an older platform is not ignored - the whole
+ * report is refused, silently, because a runtime report is fire-and-forget.
  */
 class SystemReporter extends Component
 {
@@ -49,12 +63,41 @@ class SystemReporter extends Component
      *
      * @var list<string>
      */
-    public const SCHEMAS = ['system.v2', 'system.v1'];
+    public const SCHEMAS = ['system.v3', 'system.v2', 'system.v1'];
 
     /**
      * What to send until told otherwise. Every platform that has ever existed accepts this.
      */
     public const OLDEST_SCHEMA = 'system.v1';
+
+    /**
+     * Craft's own required PHP extensions.
+     *
+     * Repeated as an enum in `system.v3.json`, which is what makes `missing_extensions` incapable of
+     * carrying anything else: a connector that started sending the loaded-extension list would be
+     * refused on arrival rather than quietly widening what is collected.
+     *
+     * The imaging extensions are absent on purpose. Craft needs one of two rather than both, so
+     * "missing" is the wrong question about them and `image_driver` answers the right one.
+     *
+     * @var list<string>
+     */
+    private const REQUIRED_EXTENSIONS = [
+        'ctype',
+        'curl',
+        'dom',
+        'fileinfo',
+        'iconv',
+        'intl',
+        'json',
+        'mbstring',
+        'openssl',
+        'pcre',
+        'pdo',
+        'reflection',
+        'spl',
+        'zip',
+    ];
 
     /**
      * @return array{payload: array<string, mixed>, problems: list<string>}
@@ -86,8 +129,30 @@ class SystemReporter extends Component
             'schema_version' => $schema,
             'collected_at' => time(),
             'storage' => $this->storage($schema),
-            'php' => $this->php(),
+            'php' => $this->php($schema),
         ];
+
+        /*
+         | Everything system.v3 added, and nothing when the platform speaks an older version.
+         |
+         | This gate is not tidiness. Every schema here sets `additionalProperties: false`, so one
+         | extra key does not get ignored on arrival - the whole report is refused, and a runtime
+         | report is fire-and-forget, so the only symptom is a Health screen that quietly stops
+         | moving. A platform on v1 or v2 must receive byte-for-byte what it received before.
+         */
+        if ($schema === 'system.v3') {
+            foreach ([
+                'craft' => fn(): array => $this->craft(),
+                'database' => fn(): array => $this->database(),
+                'paths' => fn(): array => $this->paths(),
+            ] as $key => $reader) {
+                $value = $this->safely($reader, []);
+
+                if ($value !== []) {
+                    $payload[$key] = $value;
+                }
+            }
+        }
 
         $response = Plugin::getInstance()->responseSampler->summarise();
 
@@ -350,11 +415,198 @@ class SystemReporter extends Component
     }
 
     /**
+     * How much deprecated code is still running, and three facts about how Craft is configured.
+     *
+     * Counts and booleans. Nothing here carries a message, a template name, a key or an address —
+     * see `system.v3.json`'s own description for why each of those was the more useful shape and was
+     * refused anyway.
+     *
+     * @return array<string, mixed>
+     */
+    private function craft(): array
+    {
+        $general = $this->safely(static fn(): mixed => Craft::$app->getConfig()->getGeneral(), null);
+
+        return array_filter([
+            // The count of distinct warnings, never the warnings. Each one names a template, a file
+            // and a line, and those are the site's own code.
+            'deprecation_count' => $this->safely(
+                static fn(): int => Craft::$app->getDeprecator()->getTotalLogs(),
+                null,
+            ),
+
+            // A number nobody looks at until it is in the millions, which is what an install that
+            // has never run garbage collection looks like. No session travels with it.
+            'session_rows' => $this->safely(static function(): int {
+                $table = Craft::$app->getDb()->getSchema()->getRawTableName('{{%sessions}}');
+
+                return (int) Craft::$app->getDb()->createCommand(
+                    'SELECT COUNT(*) FROM ' . Craft::$app->getDb()->quoteTableName($table),
+                )->queryScalar();
+            }, null),
+
+            // Presence, never the key. False means every token, session and encrypted value on this
+            // site is built on nothing.
+            'security_key_set' => $general === null ? null : $this->safely(
+                static fn(): bool => is_string($general->securityKey) && trim($general->securityKey) !== '',
+                null,
+            ),
+
+            /*
+             | Whether the control panel is still where Craft puts it by default.
+             |
+             | A boolean, and there is deliberately no field for the trigger itself. A site that
+             | moved its control panel moved it somewhere it would rather not have written down, and
+             | sending the new address to a dashboard would undo the thing it did. The schema has
+             | nowhere to put it either, so this cannot drift into sending one.
+            */
+            'cp_trigger_default' => $general === null ? null : $this->safely(
+                static fn(): bool => (string) $general->cpTrigger === 'admin',
+                null,
+            ),
+        ], static fn(mixed $value): bool => $value !== null);
+    }
+
+    /**
+     * How large the database is.
+     *
+     * The figure that decides whether a backup finishes, and until now the only thing this report
+     * did not measure - it described every asset volume and the disk underneath them while saying
+     * nothing about the thing being backed up.
+     *
+     * A total, never a per-table breakdown. Table names describe somebody's business and row counts
+     * describe the shape of their content; neither answers the question a backup asks.
+     *
+     * @return array<string, mixed>
+     */
+    private function database(): array
+    {
+        return array_filter([
+            'size_bytes' => $this->safely(static function(): ?int {
+                $db = Craft::$app->getDb();
+
+                if ($db->getIsPgsql()) {
+                    $size = $db->createCommand('SELECT pg_database_size(current_database())')->queryScalar();
+                } else {
+                    // Approximate on MySQL and MariaDB, and fine for the question: a backup that has
+                    // grown from 200 MB to 9 GB is a different backup, and nobody needs the exact
+                    // byte to see that.
+                    $size = $db->createCommand(
+                        'SELECT SUM(data_length + index_length) FROM information_schema.TABLES '
+                        . 'WHERE table_schema = DATABASE()',
+                    )->queryScalar();
+                }
+
+                return is_numeric($size) ? max(0, (int) $size) : null;
+            }, null),
+        ], static fn(mixed $value): bool => $value !== null);
+    }
+
+    /**
+     * Whether the directories Craft has to write to are writable.
+     *
+     * Keyed by Craft's own names rather than by path. A free-form label here would be a filesystem
+     * path with extra steps - `"/var/www/html/storage": true` reports a path while looking like it
+     * reports a permission - and the schema's fixed property list is what stops that.
+     *
+     * @return array<string, mixed>
+     */
+    private function paths(): array
+    {
+        $paths = Craft::$app->getPath();
+
+        return array_filter([
+            'storage' => $this->writable(static fn(): string => $paths->getStoragePath()),
+
+            // Not on the Path service - cpresources is a *web* directory, so where it goes is a
+            // general-config setting rather than a storage path. Craft publishes control-panel
+            // assets into it on demand, and a site where that fails serves an unstyled control panel
+            // with nothing in the log that explains it.
+            'cpresources' => $this->writable(static fn(): string => Craft::getAlias(
+                Craft::$app->getConfig()->getGeneral()->resourceBasePath,
+            ) ?: ''),
+            'config_project' => $this->writable(static fn(): string => $paths->getProjectConfigPath()),
+        ], static fn(mixed $value): bool => $value !== null);
+    }
+
+    /**
+     * Whether one directory can be written to.
+     *
+     * Null rather than false when the path cannot be resolved at all. A directory this connector
+     * could not locate and one the web server cannot write to are different problems, and only the
+     * second is the site's.
+     *
+     * @param  callable(): string  $locator
+     */
+    private function writable(callable $locator): ?bool
+    {
+        return $this->safely(static function() use ($locator): ?bool {
+            $path = $locator();
+
+            // An unresolvable alias, or a setting pointing at nothing. Reported as no answer rather
+            // than as unwritable, and guarded here rather than left to the checks below - dirname('')
+            // is '.', so an empty path would silently test this process's working directory and
+            // report the answer as though it were about Craft's.
+            if ($path === '') {
+                return null;
+            }
+
+            // Craft creates these on demand, so an absent one is not yet a fault - what matters is
+            // whether it could be created, which is a question about its parent.
+            if (!is_dir($path)) {
+                $parent = dirname($path);
+
+                return is_dir($parent) ? is_writable($parent) : null;
+            }
+
+            return is_writable($path);
+        }, null);
+    }
+
+    /**
+     * Which of Craft's required extensions are absent.
+     *
+     * Only ever members of {@see REQUIRED_EXTENSIONS}, which is Craft's own published requirements
+     * and a list the schema repeats as an enum. That closure is the point: it makes this incapable
+     * of becoming the inventory of loaded extensions that `extensions` is reduced to a count to
+     * avoid. A site running something unusual reports nothing about it either way.
+     *
+     * @return list<string>
+     */
+    private function missingExtensions(): array
+    {
+        $loaded = array_map('strtolower', get_loaded_extensions());
+
+        return array_values(array_filter(
+            self::REQUIRED_EXTENSIONS,
+            static fn(string $extension): bool => !in_array($extension, $loaded, true),
+        ));
+    }
+
+    /**
+     * Which imaging library Craft has available.
+     *
+     * `none` is a real answer and a serious one: a site in that state cannot generate a transform.
+     * Never a version - the version belongs to the host, and what a reader acts on is which of the
+     * two libraries is in play.
+     */
+    private function imageDriver(): ?string
+    {
+        return $this->safely(static function(): string {
+            if (extension_loaded('imagick')) {
+                return 'imagick';
+            }
+
+            return extension_loaded('gd') ? 'gd' : 'none';
+        }, null);
+    }
+
+    /**
      * Numeric limits only.
      *
      * @return array<string, mixed>
      */
-    private function php(): array
+    private function php(?string $schema = null): array
     {
         $opcache = $this->safely(
             static fn(): array => function_exists('opcache_get_status')
@@ -382,6 +634,13 @@ class SystemReporter extends Component
             // The count, never the list. Which extensions are loaded fingerprints the host in a way
             // "there are 47 of them" does not.
             'extensions' => count(get_loaded_extensions()),
+
+            // v3 only, and both are closed sets. See the gate in build() for why an extra key sent
+            // to an older platform would be refused rather than ignored.
+            'missing_extensions' => $schema === 'system.v3'
+                ? $this->safely(fn(): array => $this->missingExtensions(), null)
+                : null,
+            'image_driver' => $schema === 'system.v3' ? $this->imageDriver() : null,
         ], static fn(mixed $value): bool => $value !== null);
     }
 
