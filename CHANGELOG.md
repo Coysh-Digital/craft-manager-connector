@@ -1,5 +1,51 @@
 # Changelog
 
+## 1.15.0 - 2026-08-17
+
+The runtime report can now describe the Craft install, not just the disk it sits on.
+
+Nothing to do on upgrade. A site running this against a platform that has not been upgraded keeps
+sending exactly what it sent before, byte for byte - the platform says which report version it
+accepts and this plugin sends the newest that both sides know. Neither side has to move first.
+
+### What a site now reports, when the platform accepts `system.v3`
+
+- **Craft.** The number of distinct deprecation warnings it has recorded, the row count of its
+  sessions table, whether a security key is configured, and whether the control panel is still at
+  Craft's default trigger.
+- **The database size.** Total, including indexes. This is the figure that decides whether a backup
+  finishes, and it was the one thing the report did not measure — it described every asset volume and
+  the disk underneath them while saying nothing about the size of the thing being backed up.
+- **Writable directories.** Whether `storage`, `cpresources` and the project config directory can be
+  written to.
+- **Missing required extensions, and the image driver.** Which of Craft's own published requirements
+  are absent, and whether Imagick, GD or neither is available. `none` is a real answer and a serious
+  one: a site in that state cannot generate a transform.
+
+### What is deliberately not sent
+
+Each of these has a more useful shape that was refused, and `system.v3.json` carries the same
+reasoning on the wire contract itself:
+
+- **A deprecation count, never the warnings.** Each one names a template, a file and a line, and
+  those are the site's own code. The count says whether there is a problem; finding it is done on the
+  site, where the code already is.
+- **A database total, never a per-table breakdown.** Row counts describe the shape of somebody's
+  content and table names often describe their business.
+- **Whether the control panel moved, never where to.** A site that moved its control panel moved it
+  somewhere it would rather not have written down, and sending the new address to a dashboard would
+  undo the change being reported. The schema has nowhere to put it either.
+- **Whether a security key is set, never the key.**
+- **Missing extensions only from a closed list**, so this cannot become the loaded-extension
+  inventory that `extensions` is reduced to a count to avoid. Directory names come from a fixed set
+  for the same reason a volume sends a handle rather than a path.
+- **Nothing about response compression.** It is decided at the edge, so a site behind a CDN would
+  report its origin's answer rather than the one a visitor receives.
+
+### Requires
+
+- `coysh-digital/manager-protocol` moves to `^1.9`, which is where `system.v3` lives.
+
 ## 1.14.1 - 2026-08-09
 
 Nothing about this plugin's behaviour changed. Same code on a site, same wire protocol, same
