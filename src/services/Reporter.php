@@ -360,10 +360,34 @@ class Reporter extends Component
         ];
     }
 
+    /**
+     * What Craft believes about its own licence.
+     *
+     * The cache key is `licenseInfo`, and it holds an array keyed by handle - Craft's own state is
+     * under `craft`, each plugin's under `plugin-<handle>`. This read used to ask for
+     * `licenseKeyStatus`, which is a Craft 3 key and exists in neither of the majors this plugin
+     * supports, so the answer was `unknown` on every site and every report without exception.
+     *
+     * The tell, for anybody meeting this again: the plugin counts above were always right, because
+     * they go through `getAllPluginInfo()`, which reads the correct key internally. A screen showing
+     * "3 of 4 valid" for plugins beside a permanently unknown Craft licence is this bug and not a
+     * missing capability.
+     *
+     * The key is written as a literal rather than as `craft\helpers\App::CACHE_KEY_LICENSE_INFO`
+     * for the same reason the rest of this class avoids version-specific APIs: it has to hold on
+     * Craft 4.4 and Craft 5 alike, and the string is the part both agree on.
+     *
+     * `unknown` is still a real answer. Craft only writes this cache when it has talked to the
+     * Console API, so a site that has never checked for updates genuinely does not know. Craft's
+     * fifth status, `astray`, also lands here - the shared schema's enum has no member for it, and
+     * adding one is a protocol release rather than a line in this file.
+     */
     private function craftLicenceState(): string
     {
         return $this->safely(static function(): string {
-            $status = (string) Craft::$app->getCache()->get('licenseKeyStatus');
+            $info = Craft::$app->getCache()->get('licenseInfo');
+
+            $status = is_array($info) ? (string) ($info['craft']['status'] ?? '') : '';
 
             return match ($status) {
                 'valid' => 'valid',
