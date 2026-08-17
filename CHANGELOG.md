@@ -1,5 +1,36 @@
 # Changelog
 
+## 1.15.1 - 2026-08-17
+
+Fixes the Craft licence state, which has been reported as `unknown` by every site since it was first
+sent.
+
+Nothing to do on upgrade. The next report a site sends carries the real value.
+
+### The Craft licence was never actually read
+
+The reporter asked Craft's cache for `licenseKeyStatus`. That is a Craft 3 key and exists in neither
+Craft 4 nor Craft 5, so the read missed every time, and the miss fell through to `unknown` — on every
+site, in every report, without exception. It now reads `licenseInfo`, where both supported majors
+keep it, and takes Craft's own state from under the `craft` key.
+
+The plugin licence counts in the same section were always correct, because they go through Craft's
+`getAllPluginInfo()`, which reads the right key internally. So the signature of this bug was a
+sensible "3 of 4 valid" for plugins sitting beside a Craft licence that was permanently unknown, and
+it read as a missing permission rather than as a fault.
+
+A consequence worth stating plainly: because a site could only ever report `unknown`, and the
+platform's `licence_not_valid` rule declines to raise a finding from that value, **an invalid,
+mismatched or trial Craft licence has never once produced a finding.** Sites in that state have been
+reporting it correctly to a platform that was reading a field the connector never filled in.
+
+### What is still `unknown`, legitimately
+
+Craft only writes this cache after it has spoken to the Console API, so a site that has never checked
+for updates does not yet know its own licence state. Running the `updates` task populates it. Craft's
+fifth status, `astray`, also reports as `unknown` for now: the shared schema's enum has no member for
+it, and schemas are add-only, so carrying it is a protocol release rather than a line in this plugin.
+
 ## 1.15.0 - 2026-08-17
 
 The runtime report can now describe the Craft install, not just the disk it sits on.
