@@ -1,5 +1,21 @@
 # Changelog
 
+## 1.15.2 - 2026-08-18
+
+Fixes the rendering of one table in the README. No code change; upgrading gains you nothing.
+
+### The strongest section of the README rendered as line noise
+
+"What it cannot do" is four rows: no inbound instruction, no remote execution, no credentials held,
+no site content. They are the four claims someone evaluating this plugin most needs to check, and
+they sit on the landing page of a public repository whose whole argument is that the claims can be
+read rather than taken on trust.
+
+The block opened with the `|---|---|` separator and no header row above it. GitHub needs the header
+to recognise a table at all, so it rendered the four rows as raw pipe-delimited text. The content was
+correct the entire time and looked like a mistake, which on that particular section is the worst
+possible failure.
+
 ## 1.15.1 - 2026-08-17
 
 Fixes the Craft licence state, which has been reported as `unknown` by every site since it was first
