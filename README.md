@@ -148,6 +148,20 @@ The keypair is deleted outright rather than flagged, so there is nothing to reac
 Reconnecting needs a new enrolment code. Revoke the connector in Manager as well, so the platform
 stops expecting it.
 
+## What is tested, and what is not
+
+Stated plainly, because "no test directory" and "untested" are not the same thing and a reader has
+no way to tell them apart from the outside.
+
+| Layer | Where it is covered |
+|---|---|
+| Encryption, sealing, key fingerprints, the artifact envelope and the signing protocol | [`manager-protocol`](https://github.com/Coysh-Digital/manager-protocol), which has its own suite and committed cross-implementation fixtures. This plugin calls into it and implements none of it |
+| Shape of the plugin: no URL rules, no shelling out, no destination as a parameter, no unpinned recovery key, no dependency outside a fixed allowlist | `bin/verify-invariants.php`, run on every push. It reads the source, so it needs no Craft install and takes about a second |
+| The upload destination, and the closed task registry | `tests/`, run on both Craft majors |
+| **The backup pipeline end to end: dump, encrypt, seal, sign, upload, clean up** | **Nothing yet.** It is coupled to a live Craft application, so covering it needs a Craft harness this repository does not have. It is exercised by hand against a real Craft 5 testbed before a release, and that is not the same as a test |
+
+The last row is the honest gap. It is here rather than left to be discovered.
+
 ## Security
 
 Report vulnerabilities privately to support@managerforcraft.com. Please do not open a public issue.

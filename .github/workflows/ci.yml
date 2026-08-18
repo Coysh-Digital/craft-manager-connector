@@ -85,6 +85,11 @@ jobs:
 
       - run: composer phpstan
 
+      # Runs on both legs deliberately. The cases themselves are Craft-agnostic, but loading the
+      # classes under test is not: they extend craft\base\Component, so this is also the cheapest
+      # proof that the two majors both autoload what these assertions are about.
+      - run: composer test
+
       # New connector dependencies are reviewed more strictly than dashboard ones, so an advisory
       # here blocks rather than warns.
       #

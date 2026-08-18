@@ -2,19 +2,34 @@
 
 ## 1.15.2 - 2026-08-18
 
-Fixes the rendering of one table in the README. No code change; upgrading gains you nothing.
+Adds a test suite. No behaviour change, and upgrading gains a site nothing.
 
-### The strongest section of the README rendered as line noise
+### The plugin had no tests at all
 
-"What it cannot do" is four rows: no inbound instruction, no remote execution, no credentials held,
-no site content. They are the four claims someone evaluating this plugin most needs to check, and
-they sit on the landing page of a public repository whose whole argument is that the claims can be
-read rather than taken on trust.
+Not a light gap on the component that runs inside a customer's Craft install and asks it to dump its
+own database. `bin/verify-invariants.php` proves a great deal about the *shape* of this plugin, that
+it registers no URL rules, cannot shell out, accepts no destination as a parameter and refuses an
+unpinned recovery key, but it reads the source and so it can only ever prove shape. Whether a
+function returns the right answer is behaviour, and nothing checked any.
 
-The block opened with the `|---|---|` separator and no header row above it. GitHub needs the header
-to recognise a table at all, so it rendered the four rows as raw pipe-delimited text. The content was
-correct the entire time and looked like a mistake, which on that particular section is the worst
-possible failure.
+Two pieces of logic are covered, chosen because both are closed sets whose whole value is what they
+say no to, and both are pure functions that need no Craft application to exercise:
+
+- **`Client::uploadHostFor()`**, which decides where an artifact may be sent. The cases are mostly
+  refusals: an IP address, a bare label, an underscore, a trailing dot and an unparseable URL must
+  all produce an empty string rather than a partial host, because the caller refuses on empty and
+  half a destination is still a destination. One case asserts the function keeps taking exactly one
+  string, since the safety argument in its own docblock rests on there being no other input.
+- **`Tasks::isKnown()`**, the gate in front of a task name that arrives from a queue payload. It is
+  handed a method name, a path, a shell fragment and several near misses in the wrong case.
+
+`README.md` now states what is covered and what is not, in a table, including the row that says the
+backup pipeline end to end is covered by nothing yet. That is deliberate: "no test directory" and
+"untested" are not the same thing, the encryption and signing are covered in `manager-protocol`
+where they are implemented, and a reader has no way to tell any of that from the outside.
+
+`ecs.php` and `phpstan.neon` now include `tests`, so the new code is held to the same standard as
+the rest, and CI runs the suite on both Craft majors.
 
 ## 1.15.1 - 2026-08-17
 
