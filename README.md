@@ -16,6 +16,7 @@ Requires PHP 8.1+ and Craft CMS 4.4+ or 5.0+.
 
 These are not promises about intent; they are properties of the code.
 
+| Property | Why it holds |
 |---|---|
 | **No inbound instruction** | The plugin registers no URL rules at all. One endpoint answers without a session, and all it can say is "check in now" - it reads no parameters, takes no body, and pushes the same task the site already runs on its own timer. Everything the platform wants done is still discovered by this plugin calling out and reading a signed answer. Nothing depends on a nudge arriving, so a site behind NAT still needs no inbound firewall rule; it just waits for its own schedule. |
 | **No remote execution** | There is no console-command runner, no PHP evaluation, no SQL, no shell, no arbitrary file access. Jobs come from a closed registry, and this plugin refuses any type it does not itself implement - so a compromised platform cannot make your site do something new. |
