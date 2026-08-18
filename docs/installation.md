@@ -24,7 +24,7 @@ and cannot do, and how to turn it off.
 ## Install with Composer
 
 ```bash
-composer require "coysh-digital/craft-manager-connector:^1.15.1" -w && php craft plugin/install manager-connector
+composer require "coysh-digital/craft-manager-connector:^1.15.2" -w && php craft plugin/install manager-connector
 ```
 
 The version is pinned so a site records which release it took, and quoted because `^` is a glob

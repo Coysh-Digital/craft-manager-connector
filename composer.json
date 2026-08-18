@@ -1,7 +1,7 @@
 {
     "name": "coysh-digital/craft-manager-connector",
     "description": "Reports operational metadata from a Craft CMS installation to a Manager platform over signed outbound requests, with one inbound endpoint whose only meaning is \"check in now\".",
-    "version": "1.15.1",
+    "version": "1.15.2",
     "type": "craft-plugin",
     "keywords": [
         "craft",
@@ -32,7 +32,8 @@
     },
     "require-dev": {
         "craftcms/ecs": "dev-main",
-        "craftcms/phpstan": "dev-main"
+        "craftcms/phpstan": "dev-main",
+        "phpunit/phpunit": "^10.5"
     },
     "autoload": {
         "psr-4": {
@@ -76,7 +77,14 @@
         "check": [
             "@verify-invariants",
             "@check-cs",
-            "@phpstan"
-        ]
+            "@phpstan",
+            "@test"
+        ],
+        "test": "phpunit"
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "coyshdigital\\managerconnector\\Tests\\": "tests/"
+        }
     }
 }
