@@ -24,7 +24,7 @@ and cannot do, and how to turn it off.
 ## Install with Composer
 
 ```bash
-composer require "coysh-digital/craft-manager-connector:^1.15.3" -w && php craft plugin/install manager-connector
+composer require "coysh-digital/craft-manager-connector:^1.16.0" -w && php craft plugin/install manager-connector
 ```
 
 The version is pinned so a site records which release it took, and quoted because `^` is a glob
@@ -78,7 +78,7 @@ Full detail in [Pairing](/pairing).
 ## Schedule the reports
 
 Nothing is reported until something asks the plugin to. There are two ways to arrange that, and the
-second needs no server access at all.
+first needs no server access at all.
 
 ### If you cannot use cron
 
@@ -93,18 +93,25 @@ off.
 ### With cron, which is more predictable
 
 Better where you have it, because it does not depend on the queue and does not go quiet when the site
-does. Add to cron:
+does. One line runs everything:
 
 ```cron
-*/5 * * * * cd /path/to/site && php craft manager-connector/heartbeat
-0 * * * *   cd /path/to/site && php craft manager-connector/report
-0 6 * * *   cd /path/to/site && php craft manager-connector/updates
-*/5 * * * * cd /path/to/site && php craft manager-connector/jobs
+*/5 * * * * cd /path/to/site && php craft manager-connector/run
 ```
 
-The heartbeat is what makes a site look alive in the fleet table; without it Manager will eventually
-report the site as not reporting, which is correct but not what you want. See
-[Console commands](/console-commands) for what each one does and how often it is worth running.
+Every run sends the heartbeat, which is what makes a site look alive in the fleet table, and collects
+any work Manager has queued. The other reports go out when they are due. Then turn the web trigger off,
+so the schedule comes from one place, in `config/manager-connector.php`:
+
+```php
+return [
+    'webTrigger' => false,
+];
+```
+
+Leaving it on is harmless: cron and web traffic share one set of claims and cannot both fire a task in
+the same interval. See [Console commands](/console-commands) for what `run` does, how to run each task
+on its own schedule instead, and what each one reports.
 
 ## Permissions
 

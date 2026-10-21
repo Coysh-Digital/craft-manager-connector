@@ -79,7 +79,7 @@ class Plugin extends BasePlugin
     /**
      * @var string The connector version reported to the platform and signed into every request.
      */
-    public const VERSION = '1.15.3';
+    public const VERSION = '1.16.0';
 
     /**
      * @inheritdoc

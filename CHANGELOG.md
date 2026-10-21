@@ -1,5 +1,56 @@
 # Changelog
 
+## 1.16.0 - 2026-10-21
+
+One cron entry now runs everything. Nothing to do on upgrade: the per-task commands and the web
+trigger behave exactly as before, so a site already scheduled either way keeps working untouched.
+
+### `manager-connector/run`
+
+```cron
+*/5 * * * * cd /path/to/site && php craft manager-connector/run
+```
+
+Replaces the six lines the documentation used to ask for, which a site had to get right and keep
+right. Every run sends the heartbeat and collects whatever work Manager has queued. The sign-in,
+inventory, runtime and update reports go out when each is due.
+
+- **It shares the web trigger's clock.** "Due" is the same atomic cache claim `webTrigger` makes, on
+  the same keys, so cron and web traffic cannot both fire a task in the same interval. That is why
+  leaving `webTrigger` on beside it is harmless, and why turning it off is now the recommendation
+  rather than something to work out.
+- **A late run still counts.** A claim lasts the task's interval less a minute. Cron fires on the
+  minute, and without the allowance a run starting a few seconds late found the last claim still
+  standing and pushed an hourly report back a whole hour.
+- **Tasks run in the cron process, one after another, not through Craft's queue.** A task that fails
+  does not stop the rest; its error goes to stderr and the command exits non-zero, so cron's mail or
+  anything watching the exit status sees it. A task whose capability has not been granted is skipped
+  rather than failed, as it is when run alone.
+- **The heartbeat goes first and `jobs` last.** `jobs` is where a backup runs, and a backup can take
+  hours on a large site; nothing queued behind it would report until it finished.
+- **`--force` runs everything now.** It still marks each task as having run, so the web trigger does
+  not repeat one a moment later.
+
+Not new surface: it adds no URL, no controller and no way to run anything outside the existing closed
+task list, and it takes no parameter that names a task.
+
+### Documentation
+
+- **The cron sections of `README.md`, `docs/installation.md` and `docs/console-commands.md` now lead
+  with the single line**, recommend `'webTrigger' => false` alongside it, and keep the per-task
+  commands as the alternative, with a warning not to run both on one site since the per-task commands
+  do not share `run`'s claims.
+- **The command count read "Eight" and is now eleven.** The README's command table also omitted
+  `system` and `logins`, and the cron lists in the README and the installation guide left out those two
+  tasks, so a site following either never reported sign-in counters or runtime from cron.
+- **`docs/installation.md` called the cron-free route "the second" of two ways.** It is the first.
+
+### Tests
+
+`tests/SchedulerTest.php` covers the due-decision, which is a pure function of a claim callable and
+needs no Craft application: nothing claimed, everything claimed, a mix, the claim lifetime and its
+floor, `--force`, and that the always-run tasks are never claimed.
+
 ## 1.15.3 - 2026-10-21
 
 Restores the build. No behaviour change, and upgrading gains a site nothing.
