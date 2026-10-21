@@ -28,7 +28,7 @@
         "php": ">=8.1",
         "ext-sodium": "*",
         "craftcms/cms": "^4.4 || ^5.0",
-        "coysh-digital/manager-protocol": "^1.9"
+        "coysh-digital/manager-protocol": "^1.10"
     },
     "require-dev": {
         "craftcms/ecs": "dev-main",

@@ -23,7 +23,7 @@ use Throwable;
 /**
  * How the runtime is configured and how much room it is using.
  *
- * Six sections since `system.v3`, and what each deliberately leaves out matters more than what it
+ * Six sections since `system.v3`, a seventh since `system.v4`, and what each deliberately leaves out matters more than what it
  * includes:
  *
  *  - **Storage.** Byte counts and file counts per asset volume, by handle. Never a path, never a
@@ -43,12 +43,15 @@ use Throwable;
  *    per-table breakdown - table names describe somebody's business.
  *  - **Paths.** Whether Craft's own writable directories are writable, keyed by Craft's names. A
  *    free-form label here would be a filesystem path with extra steps.
+ *  - **Node.js.** The version the project *declares* - `.nvmrc`, `.node-version` or `engines.node` -
+ *    and which of the three said so. Never the installed version, which would need a shell, and
+ *    never the file, which is {@see NodeDeclaration}'s to read and nobody else's to see.
  *
  * Every section is optional in the schema. A volume that cannot be walked, an opcache that is off, a
  * site too quiet to have samples - each simply produces less, and a shorter report is valid rather
  * than deficient.
  *
- * The v3 sections are sent **only** when the platform has said it accepts v3. Every schema here sets
+ * The v3 and v4 sections are sent **only** when the platform has said it accepts them. Every schema here sets
  * `additionalProperties: false`, so an extra key sent to an older platform is not ignored - the whole
  * report is refused, silently, because a runtime report is fire-and-forget.
  */
@@ -63,7 +66,7 @@ class SystemReporter extends Component
      *
      * @var list<string>
      */
-    public const SCHEMAS = ['system.v3', 'system.v2', 'system.v1'];
+    public const SCHEMAS = ['system.v4', 'system.v3', 'system.v2', 'system.v1'];
 
     /**
      * What to send until told otherwise. Every platform that has ever existed accepts this.
@@ -140,7 +143,7 @@ class SystemReporter extends Component
          | report is fire-and-forget, so the only symptom is a Health screen that quietly stops
          | moving. A platform on v1 or v2 must receive byte-for-byte what it received before.
          */
-        if ($schema === 'system.v3') {
+        if (in_array($schema, ['system.v3', 'system.v4'], true)) {
             foreach ([
                 'craft' => fn(): array => $this->craft(),
                 'database' => fn(): array => $this->database(),
@@ -152,6 +155,16 @@ class SystemReporter extends Component
                     $payload[$key] = $value;
                 }
             }
+        }
+
+        // system.v4 adds one block. Always present on v4, with both members null for a site that
+        // declares nothing: "looked, found none" is a different answer from "did not look", and the
+        // platform shows the two differently.
+        if ($schema === 'system.v4') {
+            $payload['node'] = $this->safely(
+                static fn(): array => NodeDeclaration::detect((string) Craft::getAlias('@root')),
+                ['declared' => null, 'source' => null],
+            );
         }
 
         $response = Plugin::getInstance()->responseSampler->summarise();
@@ -635,13 +648,21 @@ class SystemReporter extends Component
             // "there are 47 of them" does not.
             'extensions' => count(get_loaded_extensions()),
 
-            // v3 only, and both are closed sets. See the gate in build() for why an extra key sent
+            // v3 onwards, and both are closed sets. See the gate in build() for why an extra key sent
             // to an older platform would be refused rather than ignored.
-            'missing_extensions' => $schema === 'system.v3'
+            'missing_extensions' => $this->hasV3Sections($schema)
                 ? $this->safely(fn(): array => $this->missingExtensions(), null)
                 : null,
-            'image_driver' => $schema === 'system.v3' ? $this->imageDriver() : null,
+            'image_driver' => $this->hasV3Sections($schema) ? $this->imageDriver() : null,
         ], static fn(mixed $value): bool => $value !== null);
+    }
+
+    /**
+     * Whether the chosen schema carries what `system.v3` introduced. v4 is v3 plus one block.
+     */
+    private function hasV3Sections(?string $schema): bool
+    {
+        return in_array($schema, ['system.v3', 'system.v4'], true);
     }
 
     /**
