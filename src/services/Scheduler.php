@@ -46,6 +46,15 @@ class Scheduler extends Component
     private const CLAIM_PREFIX = 'manager-connector.due.';
 
     /**
+     * What the single cron entry does every time it fires, whatever the schedule says.
+     *
+     * The two five-minute tasks. A cron line that fires every five minutes already *is* their schedule,
+     * so asking the cache whether they are due would only let a claim lost to web traffic skip a
+     * heartbeat the cron was about to send.
+     */
+    private const ALWAYS = [Tasks::HEARTBEAT, Tasks::JOBS];
+
+    /**
      * Push whatever is due, at most one task per request.
      *
      * One per request rather than all of them: pushing four jobs from a single visitor's request makes
@@ -92,15 +101,73 @@ class Scheduler extends Component
     }
 
     /**
-     * Claim a task for this interval, atomically.
+     * Which tasks the single cron entry should run now, claiming the ones that are due.
+     *
+     * Everything that decides is in this method and none of it touches Craft: `$claim` is handed a task
+     * and a lifetime in seconds and answers whether this caller won it. In production that is the same
+     * atomic cache add the web trigger uses, so cron and web traffic share one set of keys and cannot
+     * both fire a task in the same interval. In a test it is a closure.
+     *
+     * The lifetime is the interval less `$grace`. Cron fires on the minute, and a run that starts a few
+     * seconds late would otherwise find the previous claim still standing, skip the task, and push it a
+     * whole interval - an hourly report arriving every other hour, on a machine that is merely busy.
+     *
+     * `$force` takes every task whatever `$claim` says. The claim is still made, so that a forced run
+     * holds the web trigger off exactly as an ordinary one would.
+     *
+     * The heartbeat goes first, so a site is seen alive even if a later task is slow, and `jobs` goes
+     * last because it is the one that can run for hours: it is where a backup happens, inline, in this
+     * process, and nothing queued behind it would run until it finished.
+     *
+     * @param callable(string, int): bool $claim
+     * @return list<string> tasks to run, in the order to run them
+     */
+    public static function selectDue(callable $claim, bool $force = false, int $grace = 60): array
+    {
+        $due = [];
+
+        foreach (Tasks::schedule() as $task => $interval) {
+            if (in_array($task, self::ALWAYS, true)) {
+                continue;
+            }
+
+            $won = $claim($task, max(1, $interval - $grace));
+
+            if ($won || $force) {
+                $due[] = $task;
+            }
+        }
+
+        return [Tasks::HEARTBEAT, ...$due, Tasks::JOBS];
+    }
+
+    /**
+     * Claim whatever the single cron entry should run now. See {@see self::selectDue()}.
+     *
+     * The always-run tasks are marked as having run, so the web trigger does not push the same
+     * heartbeat a moment after cron has sent it.
+     *
+     * @return list<string>
+     */
+    public function claimDue(int $grace = 60, bool $force = false): array
+    {
+        foreach (self::ALWAYS as $task) {
+            $this->markRan($task, $grace);
+        }
+
+        return self::selectDue(fn(string $task, int $ttl): bool => $this->claim($task, $ttl), $force, $grace);
+    }
+
+    /**
+     * Claim a task for the next `$ttl` seconds, atomically.
      *
      * `add()` writes only when the key is absent, so exactly one of any number of concurrent requests
      * gets true. A read-then-write would let a burst of traffic push the same task several times.
      */
-    private function claim(string $task, int $interval): bool
+    private function claim(string $task, int $ttl): bool
     {
         try {
-            return Craft::$app->getCache()->add(self::CLAIM_PREFIX . $task, 1, $interval);
+            return Craft::$app->getCache()->add(self::CLAIM_PREFIX . $task, 1, $ttl);
         } catch (Throwable) {
             // No usable cache means no way to throttle, and an unthrottled trigger would fire on every
             // request. Doing nothing is the safe failure.
@@ -117,9 +184,10 @@ class Scheduler extends Component
      * routinely be followed by a redundant claim a moment later.
      *
      * Writes the same claim key {@see self::claim()} writes, so the two cannot disagree about when a
-     * task is next due.
+     * task is next due. `$grace` shortens the hold in the same way and for the same reason
+     * {@see self::selectDue()} does.
      */
-    public function markRan(string $task): void
+    public function markRan(string $task, int $grace = 0): void
     {
         $interval = Tasks::schedule()[$task] ?? null;
 
@@ -128,7 +196,7 @@ class Scheduler extends Component
         }
 
         try {
-            Craft::$app->getCache()->set(self::CLAIM_PREFIX . $task, 1, $interval);
+            Craft::$app->getCache()->set(self::CLAIM_PREFIX . $task, 1, max(1, $interval - $grace));
         } catch (Throwable) {
             // Only costs a duplicate claim on the next request. Nothing to report.
         }

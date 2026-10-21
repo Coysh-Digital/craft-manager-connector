@@ -55,7 +55,7 @@ work, the security model, the console commands, and troubleshooting.
 ## Installation
 
 ```bash
-composer require "coysh-digital/craft-manager-connector:^1.15.2" -w && php craft plugin/install manager-connector
+composer require "coysh-digital/craft-manager-connector:^1.16.0" -w && php craft plugin/install manager-connector
 ```
 
 Three details in that line, each of which has cost somebody a support message:
@@ -103,18 +103,38 @@ the meantime.
 
 ## Scheduling
 
+One cron entry runs everything:
+
 ```cron
-*/5  * * * *  cd /path/to/site && php craft manager-connector/heartbeat
-*/5  * * * *  cd /path/to/site && php craft manager-connector/jobs
-0    * * * *  cd /path/to/site && php craft manager-connector/report
-17   4 * * *  cd /path/to/site && php craft manager-connector/updates
+*/5 * * * *  cd /path/to/site && php craft manager-connector/run
 ```
 
-Scheduling is optional and takes the commands out of the queue. The plugin works just fine without cronjobs.
+Every run sends the heartbeat and collects any work Manager has queued. The other four reports go out
+when they are due: sign-in counters every 30 minutes, inventory hourly, runtime every 6 hours and the
+update check daily. A run a few seconds late still counts, and `run --force` sends everything now. It
+exits non-zero if any task failed.
 
-The heartbeat carries no data at all. Hourly is plenty for the inventory report, since version
-numbers only change when you deploy. The update check runs daily and at an odd minute, so a fleet of
-sites does not all ask Craft's update service at once.
+With cron in place, turn the web trigger off so the schedule comes from one place. In
+`config/manager-connector.php`:
+
+```php
+return [
+    'webTrigger' => false,
+];
+```
+
+Leaving it on does no harm, since cron and web traffic share one set of claims and cannot both fire a
+task in the same interval, but there is nothing left for it to do.
+
+Scheduling is optional. The plugin works without cron: `webTrigger` is on by default and drives the same
+schedule from ordinary web traffic. Cron is more predictable, because it does not depend on the site
+having visitors or on Craft's queue running.
+
+Prefer one entry per task? Each command in the table below runs on its own, and
+[Console commands](docs/console-commands.md#one-entry-per-task-instead) has the matching crontab.
+
+The heartbeat carries no data at all. The update check runs once a day from whenever each site first
+ran it, so a fleet of sites does not all ask Craft's update service at once.
 
 `jobs` is what makes anything the platform asks for actually happen. No work is ever pushed to your
 site: the platform may knock to ask for an early check-in, but that is all it can say, and this command
@@ -126,9 +146,12 @@ that knock arriving - if it cannot reach you, the schedule above is all that hap
 | Command | Purpose |
 |---|---|
 | `manager-connector/pair <code>` | Pair with a platform |
+| `manager-connector/run` | Run everything that is due. The one cron entry |
 | `manager-connector/heartbeat` | Report liveness |
 | `manager-connector/report` | Send an inventory report |
 | `manager-connector/updates` | Check for updates and report what is available |
+| `manager-connector/system` | Report disk usage, PHP limits and response timings |
+| `manager-connector/logins` | Report counts of failed control-panel sign-ins |
 | `manager-connector/jobs` | Ask the platform whether there is anything to do, and do it |
 | `manager-connector/preview` | Print what would be sent, without sending it |
 | `manager-connector/status` | Show the current connection |
