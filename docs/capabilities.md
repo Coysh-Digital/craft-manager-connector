@@ -12,7 +12,7 @@ site gets one of them.
 | `licences:read` | No | Whether Craft and plugin licences are valid, on trial or expiring. Never the keys |
 | `security:read` | No | Safe configuration booleans: dev mode, HTTPS enforcement, admin changes, updates in production |
 | `system:read` | No | Queue depth, failed job count, pending migration count, environment classification |
-| `runtime:read` | No | Disk usage per asset volume, free space, PHP's numeric limits and opcache state, and how long the site takes to build its own pages |
+| `runtime:read` | No | Disk usage per asset volume, free space, PHP's numeric limits and opcache state, the Node.js version the project declares, and how long the site takes to build its own pages |
 | `logins:read` | No | Counts of failed control-panel sign-ins, and how many accounts are locked out |
 | `backups:create` | **Never** | Taking a database backup, encrypting it and uploading it |
 
@@ -28,7 +28,9 @@ starting to do both, which is not something a permission should be able to do to
 
 What it sends: byte and file counts per volume, by handle; free and total disk space; PHP's memory,
 execution, upload and post limits; opcache state and memory; a count of loaded extensions; and mean,
-median, 95th-percentile and slowest render times.
+median, 95th-percentile and slowest render times. From 1.16.0 it also sends the Node.js version the
+project declares - the string from `.nvmrc`, `.node-version` or `engines.node` in `package.json`, and
+which of the three it came from.
 
 What it never sends: a path, a file name, a directory listing, `phpinfo()`, an ini path, the list of
 extensions, or any URL, visitor or address from the requests it timed. A volume it cannot walk - too

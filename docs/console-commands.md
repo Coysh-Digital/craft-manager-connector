@@ -31,8 +31,8 @@ hammering it.
 
 ### `manager-connector/system`
 
-Reports disk usage per asset volume, free space, PHP's numeric limits and opcache state, and how long
-the site has been taking to build its own pages. Requires `runtime:read`.
+Reports disk usage per asset volume, free space, PHP's numeric limits and opcache state, the Node.js
+version the project declares, and how long the site has been taking to build its own pages. Requires `runtime:read`.
 
 **Run every 6 hours.** This is the one genuinely expensive command: it walks the asset volumes, and a
 volume with a million files on network storage takes real time. Disk usage moves over days, so hourly

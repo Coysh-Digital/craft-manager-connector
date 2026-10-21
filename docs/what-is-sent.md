@@ -59,6 +59,8 @@ Counts only. Job payloads are never read, because a queued job can carry site co
 - PHP's memory limit, execution time, upload and post size limits, and input-var limit
 - Whether opcache is on, and how much of it is used
 - How many PHP extensions are loaded - the count, not the list
+- The Node.js version the project **declares**: the version or range written in `.nvmrc`,
+  `.node-version` or `engines.node` in `package.json`, and which of those three files it came from
 - Mean, median, 95th-percentile and slowest page render times
 
 Sizes, never names. A byte count says how much is there and nothing about what: no path, no file
@@ -70,6 +72,12 @@ The render times come from a fixed ring of at most 200 samples taken from traffi
 already serving. Each sample is a duration and nothing else: no URL, no visitor, no address, no user
 agent. And it is **server render time, not time to first byte** - DNS, TLS, queueing in front of PHP
 and the network to the visitor are all outside what this can see.
+
+The Node.js figure is what the project *says* it needs, not what is installed: nothing is run to find
+out. The connector reads those three files in the project root, in that order, and sends the first
+value that fits a short version-or-range pattern, exactly as written. Anything else in those files,
+including every other `package.json` key, stays on the server, and a value that does not fit - a
+path, a URL, a sentence - is reported as nothing declared rather than shortened.
 
 **Failed sign-in counts** - requires `logins:read`
 

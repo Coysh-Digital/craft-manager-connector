@@ -1,5 +1,54 @@
 # Changelog
 
+## 1.16.0 - 2026-10-21
+
+The runtime report can now say which Node.js version a site's project declares. Nothing to do on
+upgrade: it is part of `runtime:read`, it is sent only to a platform that has said it accepts
+`system.v4`, and a platform that has not receives byte-for-byte what it received before.
+
+### The Node.js version a site says it needs, and nothing else
+
+An agency maintaining a fleet wants to know which sites build on Node 18 and which on 22 without
+opening each repository. The honest version of that answer is the version the project *declares*,
+and that is what is reported. Not the version installed: that would mean running `node`, and this
+plugin cannot shell out and will not start to.
+
+It is read from the project root, in this order, from the first file that declares anything:
+
+1. `.nvmrc`
+2. `.node-version`
+3. `engines.node` in `package.json`
+
+The report carries two members, `node.declared` and `node.source`, and `source` is one of the three
+file names above, never a path. Both are null for a site that declares nothing, which is different
+from a report with no `node` block at all: one says "looked, found none" and the other says "did not
+look", and Manager shows them differently.
+
+What keeps this narrow:
+
+- **The string as written, or nothing.** `v20.11.0`, `lts/iron`, `>=18.17 <21` and `^20` are sent
+  as they appear. A value that does not fit `system.v4`'s pattern - a path, a URL, a sentence, anything
+  longer than 32 characters - is sent as null/null, never trimmed down to something that fits. A
+  partial version is a different version.
+- **The first file that says something decides.** If `.nvmrc` holds a value that cannot be sent, the
+  answer is "nothing declared", not `.node-version`'s. The tool in use would have read `.nvmrc`.
+- **Comments are not versions.** In `.nvmrc` and `.node-version`, blank lines and `#` comments are
+  skipped and a trailing `# comment` is removed.
+- **Bounded, and inside the project.** Only those three names in Craft's `@root`, never a path built
+  from anything else. A symlink resolving outside the root is treated as absent. A version file over
+  1 KB or a `package.json` over 256 KB is not read. `package.json` is decoded and one string is
+  taken from it; no other key leaves the server.
+
+The parsing lives in `NodeDeclaration`, which needs no Craft application, and is tested directly:
+comments, blank lines, ranges and aliases, a `package.json` with `engines.node` absent, not a string,
+oversized or malformed, precedence between the three files, and values that fail the pattern.
+
+### Requires manager-protocol 1.10.0
+
+`system.v4` is defined in `coysh-digital/manager-protocol` 1.10.0, and this release raises the
+constraint to `^1.10`. The schema ships inside that package, so a connector built against 1.9 cannot
+validate a v4 report.
+
 ## 1.15.2 - 2026-08-18
 
 Adds a test suite. No behaviour change, and upgrading gains a site nothing.
