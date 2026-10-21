@@ -51,6 +51,24 @@ task list, and it takes no parameter that names a task.
 needs no Craft application: nothing claimed, everything claimed, a mix, the claim lifetime and its
 floor, `--force`, and that the always-run tasks are never claimed.
 
+## 1.15.3 - 2026-10-21
+
+Restores the build. No behaviour change, and upgrading gains a site nothing.
+
+### The static analysis job could not run
+
+`craftcms/phpstan` is a development dependency pinned to its `main` branch, and on 27 August that
+branch stopped requiring PHPStan itself and began only suggesting it. A fresh install therefore had
+the Craft configuration for PHPStan and no PHPStan, and `composer phpstan` failed with `phpstan: not
+found` on every run, `main` included. Nothing in this repository had changed since the last green run
+on 18 August; the dependency had.
+
+`phpstan/phpstan` is now required directly, at `^2.1`. The 1.x line no longer installs alongside
+current `composer/pcre`, so 2.x is the only one on offer, and it reports one thing the old version let
+through: a check in `Reporter::composerPackages()` that `$path` is a string, immediately after it had
+been built by concatenation and so could not be anything else. The check is removed. It never rejected
+a path, so nothing the plugin reports or refuses has changed.
+
 ## 1.15.2 - 2026-08-18
 
 Adds a test suite. No behaviour change, and upgrading gains a site nothing.
