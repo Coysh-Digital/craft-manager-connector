@@ -234,7 +234,7 @@ class Reporter extends Component
     {
         $path = Craft::getAlias('@root') . '/composer.lock';
 
-        if (!is_string($path) || !is_file($path) || !is_readable($path)) {
+        if (!is_file($path) || !is_readable($path)) {
             return [];
         }
 

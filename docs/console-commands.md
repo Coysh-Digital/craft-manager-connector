@@ -1,6 +1,41 @@
 # Console commands
 
-Eight commands, one per thing you might want to do. All of them are safe to run by hand at any time.
+Eleven commands, one per thing you might want to do. All of them are safe to run by hand at any time.
+
+## Running everything
+
+### `manager-connector/run`
+
+The one command to put in cron. Every run sends the heartbeat and collects any work Manager has queued
+for this site, and runs the sign-in, inventory, runtime and update reports when each is due.
+
+```cron
+*/5 * * * * cd /path/to/site && php craft manager-connector/run
+```
+
+What is "due" is decided by the same cache claims the web trigger uses, so the two share one clock and
+cannot both fire a task in the same interval. A claim lasts the task's interval less a minute, so a run
+that starts a few seconds late still counts and an hourly report does not slip to every other hour.
+
+The tasks run one after another in the same process, not through Craft's queue. If one fails, the rest
+still run, the failure is printed to stderr, and the command exits non-zero so cron's mail, or anything
+watching the exit status, sees it. A task whose capability has not been granted is not a failure; it
+says so and moves on.
+
+```
+heartbeat: Heartbeat sent.
+logins: Sign-in counters reported.
+jobs: Nothing to do.
+Not due: report, system, updates
+```
+
+Add `--force` to run every task now, whatever the schedule says. It still holds the web trigger off
+afterwards, as an ordinary run would.
+
+The heartbeat goes first and `jobs` last. `jobs` is where a backup runs, and a backup can take a long
+time on a large site; nothing should wait behind it.
+
+The commands below are what `run` calls, and each can still be run alone.
 
 ## Reporting
 
@@ -12,21 +47,21 @@ collection without a stated purpose.
 This is what makes a site look alive in the fleet table. Without it Manager will eventually report the
 site as not reporting, which is accurate but not what you want.
 
-**Run every 5 minutes.**
+**Run every 5 minutes**, unless you use `run`.
 
 ### `manager-connector/report`
 
 Sends the inventory report: versions, plugin and package lists, and whatever the site's capabilities
 permit. See [What is sent](/what-is-sent).
 
-**Run hourly.** More often achieves little - the answers change when you deploy, not by the minute.
+**Run hourly**, unless you use `run`. More often achieves little - the answers change when you deploy, not by the minute.
 
 ### `manager-connector/updates`
 
 Checks installed versions against published releases and reports what is available, including whether
 anything in between is flagged as a security release. Requires `updates:read`.
 
-**Run daily.** It makes an outbound request to Craft's own update service, so there is no value in
+**Run daily**, unless you use `run`. It makes an outbound request to Craft's own update service, so there is no value in
 hammering it.
 
 ### `manager-connector/system`
@@ -34,7 +69,7 @@ hammering it.
 Reports disk usage per asset volume, free space, PHP's numeric limits and opcache state, the Node.js
 version the project declares, and how long the site has been taking to build its own pages. Requires `runtime:read`.
 
-**Run every 6 hours.** This is the one genuinely expensive command: it walks the asset volumes, and a
+**Run every 6 hours**, unless you use `run`. This is the one genuinely expensive command: it walks the asset volumes, and a
 volume with a million files on network storage takes real time. Disk usage moves over days, so hourly
 would be paying a cost every hour for a number nobody reads that often. The walk is bounded by
 `storageWalkSeconds`; a volume that runs out of budget is reported as unmeasured rather than as empty,
@@ -51,7 +86,7 @@ remote volume's bytes are not on your disk. Neither field names a provider, a bu
 Reports counts of failed control-panel sign-ins - attempts, accounts affected, accounts locked out,
 and how many of those are administrators. Never usernames or addresses. Requires `logins:read`.
 
-**Run every 30 minutes.** It is one indexed query, and frequent enough that an attack in progress is
+**Run every 30 minutes**, unless you use `run`. It is one indexed query, and frequent enough that an attack in progress is
 visible while it is still in progress.
 
 ### `manager-connector/jobs`
@@ -59,7 +94,7 @@ visible while it is still in progress.
 Claims and runs whatever work Manager has queued for this site - an immediate inventory refresh, an
 update check, or a backup.
 
-**Run every 5 minutes.** This is what makes a button in Manager appear to do something promptly.
+**Run every 5 minutes**, unless you use `run`. This is what makes a button in Manager appear to do something promptly.
 
 ## Pairing
 
@@ -107,6 +142,24 @@ Add `--report=logins` for one at a time. Valid values are `report`, `updates`, `
 ## Scheduling all of it
 
 ```cron
+*/5 * * * * cd /path/to/site && php craft manager-connector/run
+```
+
+That is the whole schedule. Add it even if the site has not been granted every capability. A task whose
+capability is missing says so and costs nothing, whereas a cron entry nobody adds when the capability
+is granted six months later produces a screen that reads "granted, but nothing reported yet"
+indefinitely, with no obvious reason why.
+
+With cron in place, set `'webTrigger' => false` in `config/manager-connector.php` so the schedule comes
+from one place. Leaving it on is harmless, since cron and web traffic share one set of claims, but it
+has nothing left to do.
+
+### One entry per task, instead
+
+If you would rather set each interval yourself, or run a task from a different user or machine, schedule
+the commands separately:
+
+```cron
 */5 * * * * cd /path/to/site && php craft manager-connector/heartbeat
 */5 * * * * cd /path/to/site && php craft manager-connector/jobs
 */30 * * * * cd /path/to/site && php craft manager-connector/logins
@@ -115,10 +168,8 @@ Add `--report=logins` for one at a time. Valid values are `report`, `updates`, `
 0 6 * * *   cd /path/to/site && php craft manager-connector/updates
 ```
 
-Schedule all six even if the site has not been granted every capability. A command whose capability is
-missing exits immediately saying so and costs nothing - whereas a cron entry nobody adds when the
-capability is granted six months later produces a screen that reads "granted, but nothing reported
-yet" indefinitely, with no obvious reason why.
+Schedule all six, for the same reason. Do not run these alongside `run` on the same site: they do not
+share its claims, so each would report in addition to it rather than instead.
 
 ### If you cannot use cron
 
@@ -144,8 +195,8 @@ Two honest limitations, which is why cron is still the recommendation where it i
 - **It depends on the queue.** A stalled Craft queue means a silent site. With cron, the connector does
   not depend on the queue at all.
 
-Turn it off with `'webTrigger' => false` in `config/manager-connector.php` if you have cron and would
-rather the schedule came from one place.
+Turn it off with `'webTrigger' => false` in `config/manager-connector.php` once you have cron, so the
+schedule comes from one place.
 
 ## Settings
 
