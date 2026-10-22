@@ -279,6 +279,14 @@ class Tasks extends Component
             throw new RuntimeException('this site is not paired with a Manager platform');
         }
 
+        if ($connection->isCopy()) {
+            throw new RuntimeException(sprintf(
+                'this connection belongs to %s and this site is served from %s, so nothing is reported from here',
+                $connection->pairedHost() ?? 'another host',
+                $connection->currentHost() ?: 'an unknown host',
+            ));
+        }
+
         if (!$connection->isActive()) {
             throw new RuntimeException(
                 'this pairing is waiting for confirmation in Manager, so nothing is reported yet'

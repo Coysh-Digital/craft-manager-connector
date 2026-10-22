@@ -47,6 +47,22 @@ abstract class BaseController extends Controller
             return null;
         }
 
+        $connection = $this->plugin()->connection;
+
+        if ($connection->isCopy()) {
+            $this->stderr(
+                sprintf(
+                    "This connection belongs to %s and this site is served from %s, so nothing is reported from here.\n",
+                    $connection->pairedHost() ?? 'another host',
+                    $connection->currentHost() ?: 'an unknown host',
+                ),
+                Console::FG_YELLOW,
+            );
+            $this->stdout("Run: php craft manager-connector/status\n");
+
+            return ExitCode::UNAVAILABLE;
+        }
+
         $this->stderr("This site is not actively paired with a Manager platform.\n", Console::FG_RED);
         $this->stdout("Run: php craft manager-connector/status\n");
 

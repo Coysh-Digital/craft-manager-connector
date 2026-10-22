@@ -162,12 +162,20 @@ class EnrolController extends Controller
     {
         $this->requirePostRequest();
 
-        Plugin::getInstance()->connection->forget();
+        $connection = Plugin::getInstance()->connection;
 
-        Craft::$app->getSession()->setNotice(Craft::t(
-            'manager-connector',
-            'Disconnected. The signing key has been deleted from this site. Revoke the connector in Manager too, so the platform stops expecting it.',
-        ));
+        // Asked before forgetting, while there is still a row. On a copy the connector in Manager is
+        // the original site's and that site is still running, so the usual advice would cut it off.
+        $isCopy = $connection->isCopy();
+
+        $connection->forget();
+
+        Craft::$app->getSession()->setNotice($isCopy
+            ? Craft::t('manager-connector', 'Forgotten. This was a copy of another site\'s connection, so leave the connector in Manager alone.')
+            : Craft::t(
+                'manager-connector',
+                'Disconnected. The signing key has been deleted from this site. Revoke the connector in Manager too, so the platform stops expecting it.',
+            ));
 
         return $this->redirectToPostedUrl();
     }

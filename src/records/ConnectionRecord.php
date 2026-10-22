@@ -23,6 +23,7 @@ use DateTime;
  * @property int $id
  * @property string $platformUrl
  * @property string $siteIdentifier the platform's external identifier for this site
+ * @property string|null $pairedHost the host the primary site was served from at pairing; null means unbound
  * @property string $publicKey base64 Ed25519
  * @property string $secretKey ciphertext, decrypted only in memory when signing
  * @property string $platformPublicKey base64 Ed25519, used to verify instructions from the platform

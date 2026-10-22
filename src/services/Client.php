@@ -78,7 +78,7 @@ class Client extends Component
             'enrolment_code' => $enrolmentCode,
             'public_key' => $keypair['public'],
             'connector_version' => Plugin::VERSION,
-            'site_url' => $this->siteHost(),
+            'site_url' => Plugin::getInstance()->connection->currentHost(),
             'nonce' => $nonce,
         ], JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
 
@@ -1066,18 +1066,5 @@ class Client extends Component
         }
 
         return null;
-    }
-
-    /**
-     * The host this site actually serves from.
-     *
-     * Sent during pairing so the platform can compare it with the domain the operator expected. A
-     * mismatch does not fail; it holds the pairing until a person has looked at both values.
-     */
-    private function siteHost(): string
-    {
-        $siteUrl = Craft::$app->getSites()->getPrimarySite()->getBaseUrl();
-
-        return $siteUrl === null ? '' : (string) parse_url($siteUrl, PHP_URL_HOST);
     }
 }

@@ -46,6 +46,15 @@ class RunController extends BaseController
 
     public function actionIndex(): int
     {
+        // A copy of somebody else's pairing is not a fault, and a cron entry that exits non-zero every
+        // five minutes on every development machine is a fault report nobody should have to read. Say
+        // so once and stop cleanly.
+        if ($this->plugin()->connection->isCopy()) {
+            $this->stdout("Not reporting: this connection belongs to another host.\n");
+
+            return ExitCode::OK;
+        }
+
         // Checked once, here, before anything is claimed. Each task would refuse for the same reason,
         // but only after this had used up a claim on every one of them.
         if (($refused = $this->requireActiveConnection()) !== null) {

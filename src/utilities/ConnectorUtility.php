@@ -86,11 +86,16 @@ class ConnectorUtility extends Utility
      */
     public static function badgeCount(): int
     {
-        $connection = Plugin::getInstance()->connection->current();
+        $service = Plugin::getInstance()->connection;
+        $connection = $service->current();
 
-        // Badged only when something wants attention: unpaired, or held for confirmation. A connected
-        // site shows nothing, because a badge that is always lit is a badge nobody reads.
-        return $connection === null || $connection->state !== 'active' ? 1 : 0;
+        // Badged only when someone has something to do: a pairing held for confirmation in Manager.
+        // An unpaired site is not an alert - on a development environment, which is most of them, there
+        // is nothing to do, and a badge that is always lit is a badge nobody reads. A copy of another
+        // site's pairing is the same: it is quiet on purpose and needs nothing.
+        return $connection !== null
+            && $connection->state === 'pending_confirmation'
+            && $service->belongsHere() ? 1 : 0;
     }
 
     public static function contentHtml(): string
@@ -101,6 +106,9 @@ class ConnectorUtility extends Utility
             'plugin' => $plugin,
             'settings' => $plugin->getSettings(),
             'connection' => $plugin->connection->current(),
+            'isCopy' => $plugin->connection->isCopy(),
+            'pairedHost' => $plugin->connection->pairedHost(),
+            'currentHost' => $plugin->connection->currentHost(),
             'connectorVersion' => Plugin::VERSION,
             'securityUrl' => 'https://managerforcraft.com/docs/security',
         ]);

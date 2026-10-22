@@ -34,6 +34,8 @@ class Connection extends Component
 {
     private ?ConnectionRecord $cached = null;
 
+    private ?bool $belongsHere = null;
+
     /**
      * The current pairing, if this site has one.
      */
@@ -55,11 +57,90 @@ class Connection extends Component
         return $record !== null && $record->state !== ConnectionRecord::STATE_DISCONNECTED;
     }
 
+    /**
+     * Whether this site is paired, confirmed, and being served from the host it was paired on.
+     *
+     * The host test is what keeps a restored copy of a production database quiet. This is the gate
+     * the scheduler, the task runner, the cron entry and the console commands all ask, so a copy is
+     * refused before a job is queued rather than failing inside one.
+     */
     public function isActive(): bool
     {
         $record = $this->current();
 
-        return $record !== null && $record->state === ConnectionRecord::STATE_ACTIVE;
+        return $record !== null
+            && $record->state === ConnectionRecord::STATE_ACTIVE
+            && $this->belongsHere();
+    }
+
+    /**
+     * The host the primary site is served from right now.
+     *
+     * Lower-cased, and empty when it cannot be worked out - a console request with no `@web` set, or a
+     * base URL that is not a URL. The same value is sent at pairing and stored with the pairing, so the
+     * two cannot drift apart.
+     */
+    public function currentHost(): string
+    {
+        $baseUrl = Craft::$app->getSites()->getPrimarySite()->getBaseUrl();
+
+        return $baseUrl === null ? '' : strtolower((string) parse_url($baseUrl, PHP_URL_HOST));
+    }
+
+    /**
+     * The host this pairing was made on, or null when it was never bound to one.
+     */
+    public function pairedHost(): ?string
+    {
+        $record = $this->current();
+
+        // Between updating the plugin and running its migrations the column does not exist yet, and
+        // reading it would throw on every request. No column means no binding, which is what this
+        // site had a moment ago.
+        $host = $record !== null && $record->hasAttribute('pairedHost') ? $record->pairedHost : null;
+
+        return is_string($host) && $host !== '' ? $host : null;
+    }
+
+    /**
+     * Whether the pairing on record is one this environment should act on.
+     *
+     * False means the row arrived from somewhere else - almost always a production backup restored into
+     * a development copy - and using it would report that copy's state as the live site's. Derived on
+     * every read and never stored, so putting the database back on its own host needs no repair.
+     */
+    public function belongsHere(): bool
+    {
+        return $this->belongsHere ??= self::hostMatches($this->pairedHost(), $this->currentHost());
+    }
+
+    /**
+     * A pairing exists and was made on a different host from this one.
+     */
+    public function isCopy(): bool
+    {
+        return $this->current() !== null && !$this->belongsHere();
+    }
+
+    /**
+     * Whether two hosts are the same host, for the purpose of deciding whether to stay quiet.
+     *
+     * Fails open when either side is unknown, which is the choice worth stating. A pairing with no
+     * recorded host predates the binding or was made where none could be determined, and a request
+     * whose host cannot be worked out is usually a cron run with no `@web` configured. Treating either
+     * as a mismatch would silence a production site's schedule on a technicality, and a monitoring
+     * plugin that goes quiet by accident is worse than one that fails to go quiet on a copy.
+     *
+     * Exact otherwise: `www.example.com` and `example.com` differ, deliberately. Guessing that they are
+     * the same site is the sort of leniency that lets a staging copy through.
+     */
+    public static function hostMatches(?string $paired, string $current): bool
+    {
+        if ($paired === null || $paired === '' || $current === '') {
+            return true;
+        }
+
+        return strtolower($paired) === strtolower($current);
     }
 
     /**
@@ -94,6 +175,11 @@ class Connection extends Component
 
         $record->platformUrl = rtrim($platformUrl, '/');
         $record->siteIdentifier = $siteIdentifier;
+
+        if ($record->hasAttribute('pairedHost')) {
+            $record->pairedHost = $this->currentHost() ?: null;
+        }
+
         $record->publicKey = $keypair['public'];
         $record->secretKey = $this->encrypt($keypair['secret']);
         $record->platformPublicKey = $platformPublicKey;
@@ -109,12 +195,17 @@ class Connection extends Component
         }
 
         $this->cached = $record;
+        $this->belongsHere = null;
 
         return $record;
     }
 
     /**
      * The signing key, in plaintext, for the duration of one call.
+     *
+     * Refused on a copy, and here as well as at the gate in {@see self::isActive()}. Every signed
+     * request goes through this method, so a path that forgot to ask whether the site was active still
+     * cannot sign as a site it has been copied from.
      */
     public function secretKey(): string
     {
@@ -122,6 +213,14 @@ class Connection extends Component
 
         if ($record === null) {
             throw new RuntimeException('This site is not paired with a Manager platform.');
+        }
+
+        if (!$this->belongsHere()) {
+            throw new RuntimeException(sprintf(
+                'This connection belongs to %s and this site is served from %s, so it will not sign as that site.',
+                $this->pairedHost() ?? 'another host',
+                $this->currentHost() ?: 'an unknown host',
+            ));
         }
 
         return $this->decrypt($record->secretKey);
@@ -411,6 +510,7 @@ class Connection extends Component
         $record?->delete();
 
         $this->cached = null;
+        $this->belongsHere = null;
     }
 
     /**
