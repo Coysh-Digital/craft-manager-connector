@@ -1,5 +1,60 @@
 # Changelog
 
+## 1.16.1 - 2026-10-22
+
+A copy of a production database no longer reports as the live site. Nothing to do on upgrade for a
+production site: run `php craft up` and it keeps reporting exactly as before.
+
+### Restoring a production backup into development
+
+A backup of a production database includes this plugin's connection record, and a signing key that
+works. Restoring one into a development environment therefore gave that environment a working identity
+for the live site. Where the two had the same security key it reported as production and overwrote live
+data in Manager; where they did not, it queued a job every few minutes that could only fail on
+decryption, and the failed-job list filled up.
+
+The connection now records the host the primary site was served from when it was paired. A site that is
+served from a different host from the one on record treats the connection as someone else's and stays
+quiet: no queue jobs are pushed, nothing is signed, nothing is sent, and nudges from the platform are
+refused. It is a state the site works out each time and does not store, so putting the database back on
+its own host resumes reporting with nothing to repair.
+
+This does not depend on `devMode`, which is the wrong test: a development copy run in production mode
+to exercise caching behaved like production under that rule. Nor does it need an environment variable
+or a step after each restore.
+
+- **Existing connections are bound at upgrade.** The migration records the host of the database it is
+  run on, so production binds to the production host and every later restore into dev goes quiet. A
+  database that was *already* restored into dev before upgrading binds to the dev host instead; there
+  is nothing in the row to say otherwise. Disconnect it there.
+- **`www.example.com` and `example.com` are different hosts.** Deliberately. Guessing they are one
+  site is the leniency that lets a staging copy through. A site moved to a new domain has to be paired
+  again, which is also what it needed before.
+- **When no host can be worked out, the connection is not bound.** That is a console request with no
+  `@web` alias, or a base URL that does not parse. It behaves as it did before this release rather than
+  silencing a production cron on a technicality.
+- **The utility says what is happening.** A copy shows the host it was paired on and the host it is
+  served from, and states that nothing has been sent from here. Its button reads *Forget this copy*, and
+  neither it nor `manager-connector/disconnect` tells anyone to revoke the connector in Manager: on a
+  copy that connector belongs to the site still running.
+- **`manager-connector/run` exits 0 on a copy.** One line, no error, so a cron entry on a development
+  machine does not report a fault every five minutes. The other commands still exit non-zero with the
+  reason. `manager-connector/status` gains the paired host.
+- **No signed request can be made from a copy.** `Connection::secretKey()` refuses as well as the
+  scheduler, so a code path that forgets to ask whether the site is active still cannot sign as a site
+  it was copied from. `bin/verify-invariants.php` fails the build if either check goes.
+
+### The utility no longer shows a permanent badge
+
+An unpaired site showed a "1" in the Utilities list for ever. On a development environment there is
+nothing to do, which made it noise. It now appears only for a pairing held for confirmation in Manager,
+which is the one state somebody has to act on.
+
+### Tests
+
+`HostBindingTest` covers the host comparison, including both ways of getting it wrong: a copy that
+reports as production, and a production site silenced because a host could not be read.
+
 ## 1.16.0 - 2026-10-21
 
 One cron entry now runs everything, and the runtime report can say which Node.js version a site's

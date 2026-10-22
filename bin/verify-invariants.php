@@ -623,6 +623,17 @@ foreach (['lowerBackupFormatFloor', 'resetBackupFormatFloor', 'clearBackupFormat
     }
 }
 
+// A copy of this site's database must not be able to sign as the site. A production backup restored into
+// development carries the pairing, and secretKey() is the one door every signed request goes through, so
+// it - not just the scheduler in front of it - has to ask whether the pairing belongs to this host.
+if (preg_match('/function secretKey\(\).*?belongsHere\(\)/s', $connectionSource) !== 1) {
+    $failures[] = 'src/services/Connection.php::secretKey() no longer checks belongsHere(); a restored copy of a production database could then report as the live site.';
+}
+
+if (preg_match('/function isActive\(\).*?belongsHere\(\)/s', $connectionSource) !== 1) {
+    $failures[] = 'src/services/Connection.php::isActive() no longer checks belongsHere(); the scheduler would queue jobs from a restored copy of a production database.';
+}
+
 // The upload host comes from the operator, and never from platform-supplied data.
 //
 // Checked as a shape, because the danger is a string concatenation that looks harmless. Only one

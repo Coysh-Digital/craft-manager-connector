@@ -33,6 +33,12 @@ class Install extends Migration
             'platformUrl' => $this->string(255)->notNull(),
             'siteIdentifier' => $this->string(64)->notNull(),
 
+            // The host the primary site was served from when this pairing was made. A copy of this
+            // row restored somewhere else sees a different host and stays quiet. Nullable: null means
+            // no binding, and exists here as well as in its own migration for the usual reason - a
+            // fresh install skips every non-install migration.
+            'pairedHost' => $this->string(255),
+
             // base64 Ed25519, 32 raw bytes.
             'publicKey' => $this->string(64)->notNull(),
 

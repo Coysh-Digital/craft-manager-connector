@@ -37,6 +37,7 @@ class StatusController extends BaseController
         $this->stdout("Manager connection\n", Console::FG_GREEN);
         $this->stdout('  State:             ' . $connection->state . "\n");
         $this->stdout('  Platform:          ' . $connection->platformUrl . "\n");
+        $this->stdout('  Paired host:       ' . ($plugin->connection->pairedHost() ?? 'not recorded') . "\n");
         $this->stdout('  Site identifier:   ' . $connection->siteIdentifier . "\n");
         $this->stdout('  Capabilities:      ' . (implode(', ', $plugin->connection->capabilities()) ?: 'none') . "\n");
         $this->stdout('  Last success:      ' . ($connection->lastSuccessAt ?? 'never') . "\n");
@@ -44,6 +45,14 @@ class StatusController extends BaseController
         // rotates it, so "rotated" described a schedule nobody is keeping.
         $this->stdout('  Signing key made:  ' . ($connection->keyRotatedAt ?? 'never') . "\n");
         $this->stdout('  Connector version: ' . Plugin::VERSION . "\n");
+
+        if ($plugin->connection->isCopy()) {
+            $this->stdout(
+                '  Here:              not reporting - served from ' . ($plugin->connection->currentHost() ?: 'an unknown host')
+                . ", so this looks like a copy of the site paired on the host above\n",
+                Console::FG_YELLOW,
+            );
+        }
 
         return ExitCode::OK;
     }

@@ -15,6 +15,7 @@
 {% import "_includes/forms.twig" as forms %}
 
 {% set connection = connection ?? null %}
+{% set isCopy = isCopy ?? false %}
 
 {% set configuredUrl = settings.platformUrl|default('')|trim %}
 
@@ -80,7 +81,24 @@
         </div>
     </form>
 {% else %}
-    {% if connection.state == 'pending_confirmation' %}
+    {% if isCopy %}
+        {# A pairing restored from somewhere else, usually a production backup pulled into a development
+           copy. Nothing is sent from here, and the screen has to say so plainly: the row still says "active",
+           and a state column that repeated it would suggest this site is reporting. #}
+        <div class="readable">
+            <blockquote class="note">
+                <p><strong>{{ "This connection belongs to another site, so this one is not reporting."|t('manager-connector') }}</strong></p>
+                <p>
+                    {{ "It was made on {paired}, and this site is served from {current}. That usually means a copy of the database was restored here. Nothing has been sent to Manager from this environment and nothing needs doing."|t('manager-connector', { paired: pairedHost ?? 'another host', current: currentHost ?: 'an unknown host' }) }}
+                </p>
+                <p>
+                    {{ "If this really is the same site on a new domain, forget this connection and pair again with a new enrolment code from Manager."|t('manager-connector') }}
+                </p>
+            </blockquote>
+        </div>
+    {% endif %}
+
+    {% if connection.state == 'pending_confirmation' and not isCopy %}
         <div class="readable">
             <blockquote class="note warning">
                 <p><strong>Waiting for confirmation.</strong></p>
@@ -97,7 +115,9 @@
             <tr>
                 <th scope="row">{{ "Connection state"|t('manager-connector') }}</th>
                 <td>
-                    {% if connection.state == 'active' %}
+                    {% if isCopy %}
+                        <span class="status"></span> {{ "Not reporting from here"|t('manager-connector') }}
+                    {% elseif connection.state == 'active' %}
                         <span class="status green"></span> {{ "Connected"|t('manager-connector') }}
                     {% elseif connection.state == 'pending_confirmation' %}
                         <span class="status orange"></span> {{ "Awaiting confirmation"|t('manager-connector') }}
@@ -110,6 +130,12 @@
                 <th scope="row">{{ "Manager platform"|t('manager-connector') }}</th>
                 <td><code>{{ connection.platformUrl }}</code></td>
             </tr>
+            {% if pairedHost %}
+                <tr>
+                    <th scope="row">{{ "Paired on"|t('manager-connector') }}</th>
+                    <td><code>{{ pairedHost }}</code></td>
+                </tr>
+            {% endif %}
             <tr>
                 <th scope="row">{{ "Site identifier"|t('manager-connector') }}</th>
                 <td><code>{{ connection.siteIdentifier }}</code></td>
@@ -226,10 +252,16 @@
                 </td>
             </tr>
             <tr>
-                <th scope="row">{{ "Disconnect"|t('manager-connector') }}</th>
+                <th scope="row">{{ isCopy ? "Forget this copy"|t('manager-connector') : "Disconnect"|t('manager-connector') }}</th>
                 <td>
+                    {# On a copy, the connector in Manager belongs to the site this was copied from and
+                       that site is still running. Telling someone to revoke it would cut it off. #}
                     <p class="light">
-                        {{ "Deletes this site's signing key, so it stops reporting. Revoke the connector in Manager as well, or the platform will keep expecting it."|t('manager-connector') }}
+                        {% if isCopy %}
+                            {{ "Deletes the signing key copied into this database. Leave the connector in Manager alone: it belongs to the original site, which is still reporting."|t('manager-connector') }}
+                        {% else %}
+                            {{ "Deletes this site's signing key, so it stops reporting. Revoke the connector in Manager as well, or the platform will keep expecting it."|t('manager-connector') }}
+                        {% endif %}
                     </p>
 
                     <form method="post" accept-charset="UTF-8">
@@ -240,7 +272,7 @@
                         <div class="buttons">
                             <button type="submit" class="btn"
                                     data-confirm="{{ 'Delete this site\'s signing key? It will stop reporting until it is paired again.'|t('manager-connector') }}">
-                                {{ "Disconnect"|t('manager-connector') }}
+                                {{ isCopy ? "Forget this copy"|t('manager-connector') : "Disconnect"|t('manager-connector') }}
                             </button>
                         </div>
                     </form>

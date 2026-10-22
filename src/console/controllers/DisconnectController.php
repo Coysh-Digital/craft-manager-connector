@@ -36,6 +36,11 @@ class DisconnectController extends BaseController
             return ExitCode::OK;
         }
 
+        // Decided before forgetting, because afterwards there is no row to ask. On a copy the connector
+        // in Manager belongs to the site this was copied from, which is still running: telling someone
+        // to revoke it would cut that site off.
+        $isCopy = $plugin->connection->isCopy();
+
         if ($this->interactive && !$this->confirm("Delete this site's Manager identity? Reconnecting will need a new enrolment code.")) {
             return ExitCode::OK;
         }
@@ -45,7 +50,12 @@ class DisconnectController extends BaseController
         Craft::info('Manager Connector disconnected.', 'manager-connector');
 
         $this->stdout("Disconnected. The signing key has been deleted from this site.\n", Console::FG_GREEN);
-        $this->stdout("Revoke the connector in Manager too, so the platform stops expecting it.\n");
+
+        if ($isCopy) {
+            $this->stdout("This was a copy of another site's connection, so leave the connector in Manager alone.\n");
+        } else {
+            $this->stdout("Revoke the connector in Manager too, so the platform stops expecting it.\n");
+        }
 
         return ExitCode::OK;
     }

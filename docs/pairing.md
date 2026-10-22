@@ -75,6 +75,21 @@ This is deliberate rather than a failure. Sites legitimately answer on more than
 staging copy pointed at the production platform is a mistake worth catching before it starts
 reporting. What it prevents is a site quietly enrolling as a site it is not.
 
+## Copying a production database to another environment
+
+Restoring a production backup into development brings the connection with it, signing key included.
+The connector notices: it records the host the site was paired on, and a site served from a different
+host treats the connection as belonging to someone else.
+
+On such a copy, nothing is queued, signed or sent, and the utility says so. There is nothing to do after
+a restore, and nothing to set in `.env`. It does not matter whether the copy runs in `devMode`.
+
+- Putting the database back on its original host resumes reporting. Nothing is stored that needs undoing.
+- `www.example.com` and `example.com` count as different hosts.
+- **Forget this copy**, or `php craft manager-connector/disconnect`, deletes the copied key. **Do not
+  revoke the connector in Manager afterwards** - it belongs to the live site.
+- A site that has genuinely moved to a new domain is paired again with a fresh code.
+
 ## Re-pairing a site that already has a connector
 
 A working connector is not replaced silently. When you issue a code for a site that already has one,

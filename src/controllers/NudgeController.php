@@ -177,6 +177,7 @@ class NudgeController extends Controller
 
         $paired = $record instanceof ConnectionRecord
             && $record->state === ConnectionRecord::STATE_ACTIVE
+            && $plugin->connection->belongsHere()
             && hash_equals($record->siteIdentifier, $siteId);
 
         // The verifying key comes from the pairing this site stored, never from the request. A key on the

@@ -61,6 +61,16 @@ should not take a site's word for its own revocation.
 Revoke the connector in Manager too. Left alone, the platform notices the silence and raises a finding,
 which is correct but slower than saying so.
 
+## The utility says this connection belongs to another site
+
+The database was restored from somewhere the site was paired on a different host, usually production
+into a development copy. The connector is staying quiet on purpose: nothing has been sent from this
+environment, and it needs no fix.
+
+If this really is the same site on a new domain, use **Forget this copy** and pair again with a new
+enrolment code. Do not revoke the connector in Manager first, or the original site stops reporting.
+`php craft manager-connector/status` shows the host it was paired on.
+
 ## The plugin settings screen redirects
 
 It redirects to **Utilities → Manager Connector**, which is where the screen lives. That is intended.
