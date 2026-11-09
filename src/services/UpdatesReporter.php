@@ -83,7 +83,11 @@ class UpdatesReporter extends Component
      */
     public function build(bool $force = false): array
     {
-        $updates = Craft::$app->getUpdates()->getUpdates($force);
+        if ($force) {
+            $this->refreshCraftsCopy();
+        }
+
+        $updates = Craft::$app->getUpdates()->getUpdates();
 
         return [
             'schema_version' => 'updates.v2',
@@ -92,6 +96,36 @@ class UpdatesReporter extends Component
             'plugins' => $this->plugins($updates),
             'php' => $this->php(),
         ];
+    }
+
+    /**
+     * Ask Craft's licensing API again, and keep what Craft already has if it cannot answer.
+     *
+     * `getUpdates(true)` is the obvious call and the wrong one. When the fetch fails it caches an
+     * empty answer for five minutes, and an empty answer is indistinguishable from "this site is
+     * up to date" - so a flaky connection between the site and Craft would report every outstanding
+     * security release as resolved, and the finding would close itself. Failing to learn something
+     * must never read as having learned that it is fine.
+     *
+     * Craft holds its answer for 24 hours, and flags a release as critical on its own side, sometimes
+     * after the release shipped. Reporting from that cache meant a release flagged today could stay
+     * invisible for up to a day, on top of however long the report itself took to come round.
+     */
+    private function refreshCraftsCopy(): void
+    {
+        try {
+            $fresh = Craft::$app->getApi()->getUpdates();
+
+            if ($fresh !== []) {
+                Craft::$app->getUpdates()->cacheUpdates($fresh);
+            }
+        } catch (Throwable $e) {
+            Craft::warning(
+                'Manager Connector could not refresh update information, reporting what Craft has cached: '
+                . $e->getMessage(),
+                __METHOD__,
+            );
+        }
     }
 
     /**
