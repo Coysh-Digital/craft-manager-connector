@@ -69,7 +69,8 @@ class Tasks extends Component
             // pays for a number nobody reads that often.
             self::SYSTEM => 21600,
 
-            // Asks a third party, so daily is plenty.
+            // Asks a third party, so daily is plenty. It asks for a fresh answer each time (see run()):
+            // Craft's own copy is good for 24 hours, and a daily report from a daily cache is two days.
             self::UPDATES => 86400,
         ];
     }
@@ -92,7 +93,8 @@ class Tasks extends Component
         return match ($task) {
             self::HEARTBEAT => $this->heartbeat(),
             self::REPORT => $this->report(),
-            self::UPDATES => $this->updates(),
+            // Forced, because the daily schedule is the same length as Craft's cache. See UpdatesReporter.
+            self::UPDATES => $this->updates(force: true),
             self::SYSTEM => $this->system(),
             self::LOGINS => $this->logins(),
             self::JOBS => $this->jobs(),

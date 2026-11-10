@@ -1,5 +1,23 @@
 # Changelog
 
+## 1.16.2 - 2026-11-09
+
+A security release Craft flags after the fact now reaches Manager the same day, instead of up to a
+day or two later. Nothing to do on upgrade: run `php craft up`.
+
+### Update checks asked a cache that was as old as the schedule
+
+The daily update report read Craft's own copy of the update feed, which Craft keeps for 24 hours. A
+release that Craft marked critical after publishing it - which does happen, and happened this week for
+an SQL injection fix - stayed invisible until the site's cache expired and the next report came
+round, so the delay could approach 48 hours. The scheduled task now asks Craft's API for a fresh
+answer each time. `php craft manager-connector/updates --force` and the Refresh button already did.
+
+If Craft cannot be reached, the report is built from what Craft already has cached rather than from
+an empty answer. `getUpdates(true)` stores an empty answer for five minutes when the fetch fails, and
+an empty answer reads as "up to date", which would have closed an open security finding on a bad
+network moment. That applied to the manual refresh as well, and is fixed there too.
+
 ## 1.16.1 - 2026-10-22
 
 A copy of a production database no longer reports as the live site. Nothing to do on upgrade for a
